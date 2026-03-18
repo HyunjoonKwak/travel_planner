@@ -1,6 +1,6 @@
 "use client";
 
-import { Star, MapPin, Trophy } from "lucide-react";
+import { Star, MapPin, Trophy, Trash2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -10,6 +10,8 @@ import { FOOD_CATEGORY_CONFIG } from "@/types/food";
 interface FoodCardProps {
   spot: FoodSpot;
   onClick: () => void;
+  onDelete?: (id: string) => void;
+  deletable?: boolean;
 }
 
 function StarRating({ rating }: { rating: number }) {
@@ -21,17 +23,30 @@ function StarRating({ rating }: { rating: number }) {
   );
 }
 
-export function FoodCard({ spot, onClick }: FoodCardProps) {
+export function FoodCard({ spot, onClick, onDelete, deletable }: FoodCardProps) {
   const config = FOOD_CATEGORY_CONFIG[spot.category];
 
   return (
     <Card
       className={cn(
-        "overflow-hidden cursor-pointer transition-all hover:shadow-md active:scale-[0.98]",
-        spot.visited && "opacity-70"
+        "overflow-hidden cursor-pointer transition-all hover:shadow-md active:scale-[0.98] relative",
+        spot.visited && "opacity-70",
       )}
       onClick={onClick}
     >
+      {deletable && onDelete && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete(spot.id);
+          }}
+          className="absolute top-2 right-2 z-10 rounded-full p-1 bg-destructive/10 hover:bg-destructive/20 text-destructive transition-colors"
+          aria-label="삭제"
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+        </button>
+      )}
       <div className="p-3">
         <div className="flex items-start justify-between gap-2 mb-2">
           <div className="min-w-0 flex-1">

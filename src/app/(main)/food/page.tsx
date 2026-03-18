@@ -140,6 +140,8 @@ function FoodSection({
   badge,
   spots,
   onCardClick,
+  onDelete,
+  deletable,
   emptyMessage,
   emptyIcon,
   action,
@@ -148,19 +150,23 @@ function FoodSection({
   badge?: React.ReactNode;
   spots: FoodSpot[];
   onCardClick: (spot: FoodSpot) => void;
+  onDelete?: (id: string) => void;
+  deletable?: boolean;
   emptyMessage: string;
   emptyIcon: string;
   action?: React.ReactNode;
 }) {
   return (
     <section>
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <h2 className="text-sm font-semibold">{title}</h2>
-          {badge}
+      {title && (
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <h2 className="text-sm font-semibold">{title}</h2>
+            {badge}
+          </div>
+          {action}
         </div>
-        {action}
-      </div>
+      )}
       {spots.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-8 text-center border rounded-lg bg-muted/20">
           <p className="text-2xl mb-2">{emptyIcon}</p>
@@ -169,7 +175,13 @@ function FoodSection({
       ) : (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {spots.map((spot) => (
-            <FoodCard key={spot.id} spot={spot} onClick={() => onCardClick(spot)} />
+            <FoodCard
+              key={spot.id}
+              spot={spot}
+              onClick={() => onCardClick(spot)}
+              onDelete={onDelete}
+              deletable={deletable}
+            />
           ))}
         </div>
       )}
@@ -251,6 +263,10 @@ export default function FoodPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [selectedCity, selectedCategory, searchQuery, userSpots],
   );
+
+  function handleDeleteUserSpot(id: string) {
+    setUserSpots((prev) => prev.filter((s) => s.id !== id));
+  }
 
   function handleAddPlace(place: GooglePlaceResult) {
     const cityName = selectedCities[0]?.name ?? "오사카";
@@ -369,6 +385,8 @@ export default function FoodPage() {
           badge={userSpots.length > 0 ? <span className="text-xs text-muted-foreground">{filteredUser.length}개</span> : undefined}
           spots={filteredUser}
           onCardClick={handleCardClick}
+          onDelete={handleDeleteUserSpot}
+          deletable
           emptyMessage="아직 추가한 맛집이 없어요. 검색 추가 버튼을 눌러보세요."
           emptyIcon="🔖"
           action={
