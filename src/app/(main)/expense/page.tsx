@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Drawer,
   DrawerContent,
@@ -15,13 +16,14 @@ import {
 import { cn } from "@/lib/utils";
 import { formatJPY, formatKRW, jpyToKrw, krwToJpy } from "@/lib/utils/currency";
 import { formatDateKo } from "@/lib/utils/date";
-import { useLocalStorage } from "@/hooks/use-local-storage";
-import { useTripConfig } from "@/hooks/use-trip-config";
+import { useActiveTrip } from "@/hooks/use-trip";
+import { useTripExpenses } from "@/hooks/use-trip-data";
 import { ExpenseForm } from "@/components/expense/expense-form";
 import { ExpenseList } from "@/components/expense/expense-list";
 import { CategoryBudgetSummary } from "@/components/expense/category-budget-summary";
 import type { Expense, ExpenseCategory } from "@/types/expense";
 import { EXPENSE_CATEGORY_CONFIG } from "@/types/expense";
+import type { BudgetConfig } from "@/hooks/use-trip-config";
 import Link from "next/link";
 
 interface BudgetBarProps {
@@ -93,6 +95,23 @@ function NoBudgetPrompt() {
   );
 }
 
+function NoTripPrompt() {
+  return (
+    <div className="flex flex-col items-center justify-center py-16 text-center px-4">
+      <PiggyBank className="h-12 w-12 text-muted-foreground/50 mb-3" />
+      <p className="text-sm font-medium">여행이 설정되지 않았습니다</p>
+      <p className="text-xs text-muted-foreground mt-1 mb-4">
+        설정에서 여행을 먼저 만들어주세요
+      </p>
+      <Link href="/settings">
+        <Button size="sm" variant="outline">
+          설정으로 이동
+        </Button>
+      </Link>
+    </div>
+  );
+}
+
 interface DailySummaryItemProps {
   date: string;
   expenses: Expense[];
@@ -152,7 +171,9 @@ function CategorySummaryItem({
         <div className="flex items-center justify-between mb-1">
           <span className="text-sm font-medium">{config.label}</span>
           <div className="text-right">
-            <span className="text-sm font-semibold">{formatJPY(categoryTotal)}</span>
+            <span className="text-sm font-semibold">
+              {formatJPY(categoryTotal)}
+            </span>
             {budgetAmount !== undefined && budgetAmount > 0 && (
               <span className="text-xs text-muted-foreground ml-1">
                 / {formatJPY(budgetAmount)}
@@ -176,23 +197,38 @@ function CategorySummaryItem({
   );
 }
 
-const INITIAL_EXPENSES: Expense[] = [];
+function parseTripJson<T>(raw: string | null | undefined): T | undefined {
+  if (!raw) return undefined;
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    return undefined;
+  }
+}
 
 export default function ExpensePage() {
-  const { config } = useTripConfig();
-  const [expenses, setExpenses] = useLocalStorage<Expense[]>(
-    "japan-expenses",
-    INITIAL_EXPENSES,
-  );
+  const { activeTrip, loading: tripLoading } = useActiveTrip();
+  const tripId = activeTrip?.id ?? "";
+  const {
+    items: dbItems,
+    create,
+    remove,
+    loading: expenseLoading,
+  } = useTripExpenses(tripId);
+
   const [drawerOpen, setDrawerOpen] = useState(false);
 
-  const budget = config.budget;
+  // Cast DB items to local Expense type (fields compatible)
+  const expenses = dbItems as unknown as Expense[];
+
+  const budget = parseTripJson<BudgetConfig>(activeTrip?.budget);
   const totalBudget = budget?.totalBudget ?? 0;
 
   const totalSpent = useMemo(
     () =>
       expenses.reduce(
-        (sum, e) => sum + (e.currency === "JPY" ? e.amount : krwToJpy(e.amount)),
+        (sum, e) =>
+          sum + (e.currency === "JPY" ? e.amount : krwToJpy(e.amount)),
         0,
       ),
     [expenses],
@@ -220,9 +256,27 @@ export default function ExpensePage() {
     });
   }, [expenses]);
 
-  function handleAddExpense(expense: Expense) {
-    setExpenses((prev) => [...prev, expense]);
+  async function handleAddExpense(expense: Expense) {
+    await create(expense);
     setDrawerOpen(false);
+  }
+
+  async function handleDeleteExpense(id: string) {
+    await remove(id);
+  }
+
+  if (tripLoading) {
+    return (
+      <div className="px-4 py-6 space-y-3">
+        <Skeleton className="h-24 w-full rounded-xl" />
+        <Skeleton className="h-10 w-full" />
+        <Skeleton className="h-32 w-full" />
+      </div>
+    );
+  }
+
+  if (!activeTrip) {
+    return <NoTripPrompt />;
   }
 
   return (
@@ -249,12 +303,23 @@ export default function ExpensePage() {
         </div>
 
         <TabsContent value="all" className="mt-0 px-4 py-4">
-          <ExpenseList expenses={expenses} />
+          {expenseLoading ? (
+            <Skeleton className="h-32 w-full" />
+          ) : (
+            <ExpenseList
+              expenses={expenses}
+              onDelete={handleDeleteExpense}
+            />
+          )}
         </TabsContent>
 
         <TabsContent value="daily" className="mt-0">
           <Card className="mx-4 my-4">
-            {groupedByDate.length === 0 ? (
+            {expenseLoading ? (
+              <div className="p-4">
+                <Skeleton className="h-24 w-full" />
+              </div>
+            ) : groupedByDate.length === 0 ? (
               <div className="py-10 text-center text-sm text-muted-foreground">
                 일별 내역이 없습니다
               </div>
@@ -274,7 +339,11 @@ export default function ExpensePage() {
 
         <TabsContent value="category" className="mt-0">
           <Card className="mx-4 my-4">
-            {groupedByCategory.length === 0 ? (
+            {expenseLoading ? (
+              <div className="p-4">
+                <Skeleton className="h-24 w-full" />
+              </div>
+            ) : groupedByCategory.length === 0 ? (
               <div className="py-10 text-center text-sm text-muted-foreground">
                 카테고리 내역이 없습니다
               </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useLocalStorage } from "./use-local-storage";
+import { useActiveTrip } from "./use-trip";
 import { getCityById } from "@/lib/data/destinations";
 
 export interface FlightInfo {
@@ -85,19 +86,64 @@ function migrateLegacy(raw: LegacyTripConfig): TripConfig {
   };
 }
 
+function safeJsonParse<T>(value: string | null | undefined): T | undefined {
+  if (!value) return undefined;
+  try {
+    return JSON.parse(value) as T;
+  } catch {
+    return undefined;
+  }
+}
+
+function tripToConfig(trip: {
+  country: string | null;
+  destinations: string | null;
+  theme: string | null;
+  startDate: string | null;
+  endDate: string | null;
+  outboundFlight: string | null;
+  returnFlight: string | null;
+  hotel: string | null;
+  budget: string | null;
+}): TripConfig {
+  const rawDestinations = safeJsonParse<string[]>(trip.destinations);
+  return {
+    country: trip.country ?? "",
+    destinations: Array.isArray(rawDestinations) ? rawDestinations : [],
+    theme: trip.theme ?? "",
+    startDate: trip.startDate ?? "",
+    endDate: trip.endDate ?? "",
+    onboarded: true,
+    outboundFlight: safeJsonParse<FlightInfo>(trip.outboundFlight),
+    returnFlight: safeJsonParse<FlightInfo>(trip.returnFlight),
+    hotel: safeJsonParse<HotelInfo>(trip.hotel),
+    budget: safeJsonParse<BudgetConfig>(trip.budget),
+  };
+}
+
 export function useTripConfig() {
   const [rawConfig, setConfig] = useLocalStorage<LegacyTripConfig>(
     "trip-config",
     DEFAULT_CONFIG,
   );
 
-  const config: TripConfig = migrateLegacy(rawConfig);
+  const { activeTrip } = useActiveTrip();
+
+  // Use DB trip if available, fall back to localStorage
+  const config: TripConfig = activeTrip
+    ? tripToConfig(activeTrip)
+    : migrateLegacy(rawConfig);
 
   function updateConfig(updates: Partial<TripConfig>) {
     setConfig((prev) => ({ ...prev, ...updates }));
   }
 
   function getTripName(): string {
+    // If DB trip exists, use its name directly
+    if (activeTrip?.name) {
+      return activeTrip.name;
+    }
+
     const cityNames = config.destinations
       .map((id) => getCityById(id)?.name)
       .filter(Boolean)

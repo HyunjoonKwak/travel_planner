@@ -1,16 +1,47 @@
 "use client";
 
 import Link from "next/link";
-import { Plus, Camera } from "lucide-react";
+import { Plus, Camera, Loader2 } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { JournalEntry } from "@/components/journal/journal-entry";
 import { PhotoThumbnail } from "@/components/journal/photo-thumbnail";
-import { useLocalStorage } from "@/hooks/use-local-storage";
+import { useActiveTrip } from "@/hooks/use-trip";
+import { useTripJournal } from "@/hooks/use-trip-data";
 import { JournalEntry as JournalEntryType } from "@/types/journal";
 import { cn } from "@/lib/utils";
 
-const STORAGE_KEY = "journal_entries";
+// Adapter: DB JournalEntry -> local JournalEntry type
+function adaptDbEntry(dbEntry: {
+  id: string;
+  date: string;
+  content: string;
+  location: string | null;
+  mood: string;
+  photoIds: string | null;
+  createdAt: string;
+  updatedAt: string;
+}): JournalEntryType {
+  let photoIds: string[] = [];
+  if (dbEntry.photoIds) {
+    try {
+      const parsed = JSON.parse(dbEntry.photoIds);
+      photoIds = Array.isArray(parsed) ? parsed : [];
+    } catch {
+      photoIds = [];
+    }
+  }
+  return {
+    id: dbEntry.id,
+    date: dbEntry.date,
+    content: dbEntry.content,
+    location: dbEntry.location ?? undefined,
+    mood: (dbEntry.mood as JournalEntryType["mood"]) ?? "neutral",
+    photoIds,
+    createdAt: dbEntry.createdAt,
+    updatedAt: dbEntry.updatedAt,
+  };
+}
 
 function EmptyState() {
   return (
@@ -22,6 +53,21 @@ function EmptyState() {
         className={cn(buttonVariants({ size: "sm", variant: "outline" }))}
       >
         첫 일기 쓰기
+      </Link>
+    </div>
+  );
+}
+
+function NoTripState() {
+  return (
+    <div className="flex flex-col items-center justify-center py-20 gap-4 text-muted-foreground">
+      <span className="text-4xl">🗺️</span>
+      <p className="text-sm">활성화된 여행이 없어요.</p>
+      <Link
+        href="/settings"
+        className={cn(buttonVariants({ size: "sm", variant: "outline" }))}
+      >
+        여행 설정하기
       </Link>
     </div>
   );
@@ -61,7 +107,6 @@ function GalleryView({ entries }: { readonly entries: JournalEntryType[] }) {
             alt={`${entry.date} 사진`}
             className="h-full w-full object-cover transition-opacity group-active:opacity-80"
           />
-          {/* Date overlay */}
           <div className="absolute bottom-0 left-0 right-0 bg-black/50 px-1.5 py-1 opacity-0 group-hover:opacity-100 transition-opacity">
             <p className="text-white text-[10px] leading-tight truncate">
               {entry.date.slice(5).replace("-", "/")}
@@ -74,7 +119,6 @@ function GalleryView({ entries }: { readonly entries: JournalEntryType[] }) {
 }
 
 function TimelineView({ entries }: { readonly entries: JournalEntryType[] }) {
-  // Group entries by date
   const grouped = entries.reduce<Record<string, JournalEntryType[]>>((acc, entry) => {
     const existing = acc[entry.date] ?? [];
     return { ...acc, [entry.date]: [...existing, entry] };
@@ -106,7 +150,29 @@ function TimelineView({ entries }: { readonly entries: JournalEntryType[] }) {
 }
 
 export default function JournalPage() {
-  const [entries] = useLocalStorage<JournalEntryType[]>(STORAGE_KEY, []);
+  const { activeTrip, loading: tripLoading } = useActiveTrip();
+  const { items: dbEntries, loading: journalLoading } = useTripJournal(activeTrip?.id ?? "");
+
+  if (tripLoading || journalLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (!activeTrip) {
+    return (
+      <div className="relative min-h-screen pb-24">
+        <div className="px-4 pt-6 pb-4">
+          <h1 className="text-2xl font-bold">여행 일기</h1>
+        </div>
+        <NoTripState />
+      </div>
+    );
+  }
+
+  const entries = dbEntries.map(adaptDbEntry);
 
   const sortedEntries = [...entries].sort(
     (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),

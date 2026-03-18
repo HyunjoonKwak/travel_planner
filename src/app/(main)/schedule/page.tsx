@@ -10,16 +10,19 @@ import {
   DrawerHeader,
   DrawerTitle,
 } from "@/components/ui/drawer";
+import { Skeleton } from "@/components/ui/skeleton";
 import { formatDateKo } from "@/lib/utils/date";
 import { ScheduleList } from "@/components/schedule/schedule-list";
 import { ScheduleForm } from "@/components/schedule/schedule-form";
 import { ScheduleMap } from "@/components/schedule/schedule-map";
 import { CalendarStrip } from "@/components/schedule/calendar-strip";
 import { FlightBar, HotelBar } from "@/components/schedule/travel-info-bar";
-import { useTripConfig } from "@/hooks/use-trip-config";
-import { useLocalStorage } from "@/hooks/use-local-storage";
+import { useActiveTrip } from "@/hooks/use-trip";
+import { useTripSchedules } from "@/hooks/use-trip-data";
 import { AIScheduleDrawer } from "@/components/schedule/ai-schedule-drawer";
 import type { ScheduleItem } from "@/types/schedule";
+import type { FlightInfo, HotelInfo } from "@/hooks/use-trip-config";
+import Link from "next/link";
 
 function generateTripDates(start: string, end: string): string[] {
   if (!start || !end) return [];
@@ -49,21 +52,57 @@ function getUniquePlaces(items: ScheduleItem[]) {
     }));
 }
 
-export default function SchedulePage() {
-  const [items, setItems] = useLocalStorage<ScheduleItem[]>(
-    "travel-schedule",
-    [],
+function parseTripJson<T>(raw: string | null | undefined): T | undefined {
+  if (!raw) return undefined;
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    return undefined;
+  }
+}
+
+function NoTripPrompt() {
+  return (
+    <div className="flex flex-col items-center justify-center py-16 text-center px-4">
+      <p className="text-3xl mb-3">✈️</p>
+      <p className="text-sm font-medium">여행이 설정되지 않았습니다</p>
+      <p className="text-xs text-muted-foreground mt-1 mb-4">
+        설정에서 여행을 먼저 만들어주세요
+      </p>
+      <Link href="/settings">
+        <Button size="sm" variant="outline">
+          설정으로 이동
+        </Button>
+      </Link>
+    </div>
   );
+}
+
+export default function SchedulePage() {
+  const { activeTrip, loading: tripLoading } = useActiveTrip();
+  const tripId = activeTrip?.id ?? "";
+  const { items: dbItems, create, update, remove, loading: scheduleLoading } =
+    useTripSchedules(tripId);
+
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [aiDrawerOpen, setAiDrawerOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<ScheduleItem | undefined>();
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
 
-  const { config } = useTripConfig();
+  // Cast DB items to local ScheduleItem type (fields are compatible)
+  const items = dbItems as unknown as ScheduleItem[];
+
+  const outboundFlight = parseTripJson<FlightInfo>(activeTrip?.outboundFlight);
+  const returnFlight = parseTripJson<FlightInfo>(activeTrip?.returnFlight);
+  const hotel = parseTripJson<HotelInfo>(activeTrip?.hotel);
 
   const tripDates = useMemo(
-    () => generateTripDates(config.startDate, config.endDate),
-    [config.startDate, config.endDate],
+    () =>
+      generateTripDates(
+        activeTrip?.startDate ?? "",
+        activeTrip?.endDate ?? "",
+      ),
+    [activeTrip?.startDate, activeTrip?.endDate],
   );
 
   const filteredItems = useMemo(() => {
@@ -96,26 +135,22 @@ export default function SchedulePage() {
     return getUniquePlaces(source);
   }, [sortedItems, allSorted, selectedDate]);
 
-  const hasTravelInfo = !!(
-    config.outboundFlight ||
-    config.returnFlight ||
-    config.hotel
-  );
+  const hasTravelInfo = !!(outboundFlight || returnFlight || hotel);
 
-  function handleAddItem(item: ScheduleItem) {
-    setItems((prev) => [...prev, item]);
+  async function handleAddItem(item: ScheduleItem) {
+    await create(item);
     setDrawerOpen(false);
     setEditingItem(undefined);
   }
 
-  function handleEditItem(item: ScheduleItem) {
-    setItems((prev) => prev.map((i) => (i.id === item.id ? item : i)));
+  async function handleEditItem(item: ScheduleItem) {
+    await update(item.id, item);
     setDrawerOpen(false);
     setEditingItem(undefined);
   }
 
-  function handleDelete(id: string) {
-    setItems((prev) => prev.filter((i) => i.id !== id));
+  async function handleDelete(id: string) {
+    await remove(id);
   }
 
   function handleSubmit(data: ScheduleItem) {
@@ -126,8 +161,8 @@ export default function SchedulePage() {
     }
   }
 
-  function handleAIApply(aiItems: ScheduleItem[]) {
-    setItems((prev) => [...prev, ...aiItems]);
+  async function handleAIApply(aiItems: ScheduleItem[]) {
+    await Promise.all(aiItems.map((item) => create(item)));
   }
 
   function openAdd() {
@@ -138,6 +173,20 @@ export default function SchedulePage() {
   function openEdit(item: ScheduleItem) {
     setEditingItem(item);
     setDrawerOpen(true);
+  }
+
+  if (tripLoading) {
+    return (
+      <div className="px-4 py-6 space-y-3">
+        <Skeleton className="h-10 w-full" />
+        <Skeleton className="h-32 w-full" />
+        <Skeleton className="h-20 w-full" />
+      </div>
+    );
+  }
+
+  if (!activeTrip) {
+    return <NoTripPrompt />;
   }
 
   const hasNoDates = tripDates.length === 0;
@@ -164,30 +213,32 @@ export default function SchedulePage() {
           <div className="px-4 py-4 space-y-3">
             {hasTravelInfo && (
               <div className="space-y-2">
-                {config.outboundFlight && (
+                {outboundFlight && (
                   <FlightBar
-                    flight={config.outboundFlight}
+                    flight={outboundFlight}
                     direction="outbound"
                     onAddToSchedule={handleAddItem}
                   />
                 )}
-                {config.returnFlight && (
+                {returnFlight && (
                   <FlightBar
-                    flight={config.returnFlight}
+                    flight={returnFlight}
                     direction="return"
                     onAddToSchedule={handleAddItem}
                   />
                 )}
-                {config.hotel && (
-                  <HotelBar
-                    hotel={config.hotel}
-                    onAddToSchedule={handleAddItem}
-                  />
+                {hotel && (
+                  <HotelBar hotel={hotel} onAddToSchedule={handleAddItem} />
                 )}
               </div>
             )}
 
-            {hasNoDates ? (
+            {scheduleLoading ? (
+              <div className="space-y-2">
+                <Skeleton className="h-20 w-full rounded-lg" />
+                <Skeleton className="h-20 w-full rounded-lg" />
+              </div>
+            ) : hasNoDates ? (
               <div className="flex flex-col items-center justify-center py-12 text-center border rounded-lg bg-muted/20">
                 <p className="text-3xl mb-2">📅</p>
                 <p className="text-sm text-muted-foreground">
@@ -220,7 +271,7 @@ export default function SchedulePage() {
               </>
             )}
 
-            {items.length === 0 && !hasNoDates && (
+            {items.length === 0 && !hasNoDates && !scheduleLoading && (
               <div className="flex flex-col items-center justify-center py-8 text-center">
                 <p className="text-3xl mb-2">✈️</p>
                 <p className="text-sm text-muted-foreground">
@@ -236,7 +287,9 @@ export default function SchedulePage() {
 
         <TabsContent value="list" className="mt-0">
           <div className="px-4 py-4">
-            {allSorted.length === 0 ? (
+            {scheduleLoading ? (
+              <Skeleton className="h-32 w-full" />
+            ) : allSorted.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-16 text-center">
                 <p className="text-3xl mb-2">📋</p>
                 <p className="text-sm text-muted-foreground">

@@ -9,6 +9,7 @@ import {
   Trash2,
   MapPin,
   Calendar,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -17,6 +18,8 @@ import {
   Dialog,
   DialogContent,
 } from "@/components/ui/dialog";
+import { useActiveTrip } from "@/hooks/use-trip";
+import { useTripJournal } from "@/hooks/use-trip-data";
 import { useLocalStorage } from "@/hooks/use-local-storage";
 import {
   JournalEntry,
@@ -27,7 +30,6 @@ import { formatDateKo } from "@/lib/utils/date";
 import { PhotoThumbnail } from "@/components/journal/photo-thumbnail";
 import { PhotoViewer } from "@/components/journal/photo-viewer";
 
-const JOURNAL_KEY = "journal_entries";
 const SCHEDULE_KEY = "travel-schedule";
 
 interface Props {
@@ -72,20 +74,60 @@ function ScheduleSection({ date }: { readonly date: string }) {
   );
 }
 
+function parsePhotoIds(photoIds: string | null | undefined): string[] {
+  if (!photoIds) return [];
+  try {
+    const parsed = JSON.parse(photoIds);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function adaptDbEntry(dbEntry: {
+  id: string;
+  date: string;
+  content: string;
+  location: string | null;
+  mood: string;
+  photoIds: string | null;
+  createdAt: string;
+  updatedAt: string;
+}): JournalEntry {
+  return {
+    id: dbEntry.id,
+    date: dbEntry.date,
+    content: dbEntry.content,
+    location: dbEntry.location ?? undefined,
+    mood: (dbEntry.mood as JournalEntry["mood"]) ?? "neutral",
+    photoIds: parsePhotoIds(dbEntry.photoIds),
+    createdAt: dbEntry.createdAt,
+    updatedAt: dbEntry.updatedAt,
+  };
+}
+
 export default function JournalDetailPage({ params }: Props) {
   const { id } = use(params);
   const router = useRouter();
-  const [entries, setEntries] = useLocalStorage<JournalEntry[]>(
-    JOURNAL_KEY,
-    [],
-  );
+
+  const { activeTrip, loading: tripLoading } = useActiveTrip();
+  const { items, loading: journalLoading, remove } = useTripJournal(activeTrip?.id ?? "");
+
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [viewerOpen, setViewerOpen] = useState(false);
   const [viewerIndex, setViewerIndex] = useState(0);
 
-  const entry = entries.find((e) => e.id === id);
+  if (tripLoading || journalLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
 
-  if (!entry) {
+  const dbEntry = items.find((e) => e.id === id);
+
+  if (!dbEntry) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen gap-4">
         <p className="text-muted-foreground">일기를 찾을 수 없어요.</p>
@@ -99,14 +141,15 @@ export default function JournalDetailPage({ params }: Props) {
     );
   }
 
+  const entry = adaptDbEntry(dbEntry);
   const moodConfig = MOOD_CONFIG[entry.mood];
   const photoRefs: string[] = [
     ...(entry.photoIds ?? []),
     ...(entry.photos ?? []),
   ];
 
-  function handleDelete() {
-    setEntries((prev) => prev.filter((e) => e.id !== id));
+  async function handleDelete() {
+    await remove(id);
     router.push("/journal");
   }
 

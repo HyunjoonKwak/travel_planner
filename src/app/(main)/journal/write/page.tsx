@@ -8,14 +8,14 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
-import { useLocalStorage } from "@/hooks/use-local-storage";
+import { useActiveTrip } from "@/hooks/use-trip";
+import { useTripJournal } from "@/hooks/use-trip-data";
 import { usePhotos } from "@/hooks/use-photos";
-import { JournalEntry, Mood, MOOD_CONFIG } from "@/types/journal";
-import { formatDateKo, generateId } from "@/lib/utils/date";
+import { Mood, MOOD_CONFIG } from "@/types/journal";
+import { formatDateKo } from "@/lib/utils/date";
 import { cn } from "@/lib/utils";
 import { PhotoThumbnail } from "@/components/journal/photo-thumbnail";
 
-const STORAGE_KEY = "journal_entries";
 const MOOD_KEYS = Object.keys(MOOD_CONFIG) as Mood[];
 
 interface PendingPhoto {
@@ -28,7 +28,8 @@ function JournalWriteForm() {
   const searchParams = useSearchParams();
   const editId = searchParams.get("edit");
 
-  const [entries, setEntries] = useLocalStorage<JournalEntry[]>(STORAGE_KEY, []);
+  const { activeTrip, loading: tripLoading } = useActiveTrip();
+  const { items, create, update } = useTripJournal(activeTrip?.id ?? "");
   const { upload } = usePhotos();
 
   const cameraInputRef = useRef<HTMLInputElement>(null);
@@ -43,23 +44,35 @@ function JournalWriteForm() {
   const [pendingPhotos, setPendingPhotos] = useState<PendingPhoto[]>([]);
   const [existingPhotoIds, setExistingPhotoIds] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [initialized, setInitialized] = useState(false);
 
   // Pre-fill form when editing
   useEffect(() => {
     if (initialized) return;
-    if (editId) {
-      const target = entries.find((e) => e.id === editId);
+    if (editId && items.length > 0) {
+      const target = items.find((e) => e.id === editId);
       if (target) {
         setDate(target.date);
         setContent(target.content);
         setLocation(target.location ?? "");
-        setMood(target.mood);
-        setExistingPhotoIds([...(target.photoIds ?? [])]);
+        setMood((target.mood as Mood) ?? "neutral");
+
+        // photoIds is stored as JSON string in DB
+        if (target.photoIds) {
+          try {
+            const parsed = JSON.parse(target.photoIds);
+            setExistingPhotoIds(Array.isArray(parsed) ? parsed : []);
+          } catch {
+            setExistingPhotoIds([]);
+          }
+        }
+        setInitialized(true);
       }
+    } else if (!editId) {
+      setInitialized(true);
     }
-    setInitialized(true);
-  }, [editId, entries, initialized]);
+  }, [editId, items, initialized]);
 
   async function handlePhotoChange(e: ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files ?? []);
@@ -93,48 +106,35 @@ function JournalWriteForm() {
     setExistingPhotoIds((prev) => prev.filter((p) => p !== id));
   }
 
-  function handleSave() {
-    if (!content.trim()) return;
+  async function handleSave() {
+    if (!content.trim() || !activeTrip) return;
 
-    const now = new Date().toISOString();
+    setSaving(true);
     const allPhotoIds = [
       ...existingPhotoIds,
       ...pendingPhotos.map((p) => p.id),
     ];
 
-    if (editId) {
-      setEntries((prev) =>
-        prev.map((e) =>
-          e.id === editId
-            ? {
-                ...e,
-                date,
-                content: content.trim(),
-                location: location.trim() || undefined,
-                mood,
-                photoIds: allPhotoIds,
-                photos: undefined,
-                updatedAt: now,
-              }
-            : e,
-        ),
-      );
-      pendingPhotos.forEach((p) => URL.revokeObjectURL(p.previewUrl));
-      router.push(`/journal/${editId}`);
-    } else {
-      const newEntry: JournalEntry = {
-        id: generateId(),
-        date,
-        content: content.trim(),
-        location: location.trim() || undefined,
-        mood,
-        photoIds: allPhotoIds,
-        createdAt: now,
-        updatedAt: now,
-      };
-      setEntries((prev) => [newEntry, ...prev]);
-      pendingPhotos.forEach((p) => URL.revokeObjectURL(p.previewUrl));
-      router.push("/journal");
+    const payload = {
+      date,
+      content: content.trim(),
+      location: location.trim() || null,
+      mood,
+      photoIds: JSON.stringify(allPhotoIds),
+    };
+
+    try {
+      if (editId) {
+        await update(editId, payload);
+        pendingPhotos.forEach((p) => URL.revokeObjectURL(p.previewUrl));
+        router.push(`/journal/${editId}`);
+      } else {
+        await create(payload);
+        pendingPhotos.forEach((p) => URL.revokeObjectURL(p.previewUrl));
+        router.push("/journal");
+      }
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -148,6 +148,26 @@ function JournalWriteForm() {
   }
 
   const isEditing = Boolean(editId);
+  const isBusy = uploading || saving;
+
+  if (tripLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (!activeTrip) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen gap-4 px-4">
+        <p className="text-muted-foreground text-sm">활성화된 여행이 없어요.</p>
+        <Button variant="outline" onClick={() => router.push("/settings")}>
+          여행 설정하기
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen pb-10">
@@ -162,9 +182,9 @@ function JournalWriteForm() {
         <Button
           size="sm"
           onClick={handleSave}
-          disabled={!content.trim() || uploading}
+          disabled={!content.trim() || isBusy}
         >
-          {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : "저장"}
+          {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "저장"}
         </Button>
       </div>
 
@@ -359,7 +379,6 @@ function JournalWriteForm() {
     </div>
   );
 }
-
 
 export default function JournalWritePage() {
   return (

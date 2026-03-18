@@ -1,8 +1,10 @@
 "use client";
 
 import { useMemo } from "react";
+import { Trash2 } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { formatDateKo } from "@/lib/utils/date";
 import { formatJPY, formatKRW, jpyToKrw, krwToJpy } from "@/lib/utils/currency";
 import type { Expense } from "@/types/expense";
@@ -10,6 +12,7 @@ import { EXPENSE_CATEGORY_CONFIG } from "@/types/expense";
 
 interface ExpenseListProps {
   expenses: Expense[];
+  onDelete?: (id: string) => void;
 }
 
 function groupByDate(expenses: Expense[]): Map<string, Expense[]> {
@@ -29,7 +32,13 @@ function getDayTotal(dayExpenses: Expense[]): number {
   return dayExpenses.reduce((sum, e) => sum + toJpy(e), 0);
 }
 
-function ExpenseItemRow({ expense }: { expense: Expense }) {
+function ExpenseItemRow({
+  expense,
+  onDelete,
+}: {
+  expense: Expense;
+  onDelete?: (id: string) => void;
+}) {
   const config = EXPENSE_CATEGORY_CONFIG[expense.category];
   const isJpy = expense.currency === "JPY";
   const jpyAmount = toJpy(expense);
@@ -66,11 +75,22 @@ function ExpenseItemRow({ expense }: { expense: Expense }) {
           {isJpy ? formatKRW(krwAmount) : `≈ ${formatJPY(jpyAmount)}`}
         </p>
       </div>
+
+      {onDelete && (
+        <Button
+          size="icon"
+          variant="ghost"
+          className="h-7 w-7 shrink-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+          onClick={() => onDelete(expense.id)}
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+        </Button>
+      )}
     </div>
   );
 }
 
-export function ExpenseList({ expenses }: ExpenseListProps) {
+export function ExpenseList({ expenses, onDelete }: ExpenseListProps) {
   const grouped = useMemo(() => groupByDate(expenses), [expenses]);
   const entries = useMemo(
     () => Array.from(grouped.entries()).sort(([a], [b]) => b.localeCompare(a)),
@@ -106,7 +126,7 @@ export function ExpenseList({ expenses }: ExpenseListProps) {
             <Separator className="mb-1" />
             <div className="divide-y divide-border/50">
               {sorted.map((expense) => (
-                <ExpenseItemRow key={expense.id} expense={expense} />
+                <ExpenseItemRow key={expense.id} expense={expense} onDelete={onDelete} />
               ))}
             </div>
           </div>
