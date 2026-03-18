@@ -59,7 +59,7 @@ export default function DashboardPage() {
           <WeatherExchangeCard />
         </div>
 
-        <TodaySchedule />
+        <TodaySchedule startDate={activeTrip.startDate ?? undefined} />
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <ExpenseSummary />
