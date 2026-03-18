@@ -87,7 +87,11 @@ export default function AttractionsPage() {
   >("user_attractions", []);
 
   const destinations = parseDest(activeTrip?.destinations);
-  const effectiveDestinations = destinations.length > 0 ? destinations : [];
+  const effectiveDestinations = useMemo(
+    () => (destinations.length > 0 ? destinations : []),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [destinations.join(",")],
+  );
 
   // All hooks MUST be before any conditional return
   const {

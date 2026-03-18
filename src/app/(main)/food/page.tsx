@@ -249,7 +249,11 @@ export default function FoodPage() {
   const [userSpots, setUserSpots] = useLocalStorage<FoodSpot[]>("user_food_spots", []);
 
   const destinations = parseDest(activeTrip?.destinations);
-  const effectiveDestinations = destinations.length > 0 ? destinations : [];
+  const effectiveDestinations = useMemo(
+    () => (destinations.length > 0 ? destinations : []),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [destinations.join(",")],
+  );
 
   // All hooks MUST be called before any conditional return
   const curatedSpots = useMemo(

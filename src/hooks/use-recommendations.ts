@@ -87,7 +87,8 @@ export function useRecommendations({
     } finally {
       setLoading(false);
     }
-  }, [cities, type, enabled, cacheKey]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cacheKey, enabled]);
 
   useEffect(() => {
     fetchRecommendations();
