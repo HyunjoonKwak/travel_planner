@@ -1,16 +1,18 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 
 export function useLocalStorage<T>(
   key: string,
   initialValue: T,
 ): [T, (value: T | ((prev: T) => T)) => void] {
   const [storedValue, setStoredValue] = useState<T>(initialValue);
-  const [hydrated, setHydrated] = useState(false);
+  const initialized = useRef(false);
 
-  // Load from localStorage after hydration
+  // Load from localStorage once after mount (client-only)
   useEffect(() => {
+    if (initialized.current) return;
+    initialized.current = true;
     try {
       const item = window.localStorage.getItem(key);
       if (item) {
@@ -19,8 +21,8 @@ export function useLocalStorage<T>(
     } catch {
       // ignore
     }
-    setHydrated(true);
-  }, [key]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const setValue = useCallback(
     (value: T | ((prev: T) => T)) => {
