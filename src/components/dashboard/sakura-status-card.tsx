@@ -1,8 +1,10 @@
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { useTripConfig } from "@/hooks/use-trip-config";
+import { getDday } from "@/lib/utils/date";
 
 interface SeasonHighlight {
   readonly icon: string;
@@ -125,6 +127,82 @@ function getSeasonHighlights(
   return null;
 }
 
+const BLOOM_START = "2026-03-20";
+const BLOOM_FULL = "2026-03-31";
+
+function BloomStatus() {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const start = new Date(BLOOM_START);
+  const full = new Date(BLOOM_FULL);
+
+  let percent = 0;
+  if (today >= full) percent = 100;
+  else if (today > start) {
+    const total = full.getTime() - start.getTime();
+    const elapsed = today.getTime() - start.getTime();
+    percent = Math.round((elapsed / total) * 100);
+  }
+
+  const daysToFull = getDday(BLOOM_FULL);
+  const stages = [
+    { min: 0, label: "꽃봉오리", emoji: "🪴" },
+    { min: 1, label: "개화 시작", emoji: "🌿" },
+    { min: 30, label: "3부 개화", emoji: "🌱" },
+    { min: 50, label: "5부 개화", emoji: "🌷" },
+    { min: 70, label: "7부 개화", emoji: "🌸" },
+    { min: 90, label: "거의 만개", emoji: "💐" },
+    { min: 100, label: "만개!", emoji: "🌸" },
+  ];
+  const stage = [...stages].reverse().find((s) => percent >= s.min) ?? stages[0];
+
+  return (
+    <div className="mt-3 pt-3 border-t border-pink-200/50 dark:border-pink-800/50">
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-1.5">
+          <span className="text-lg">{stage.emoji}</span>
+          <span className="text-sm font-medium text-pink-700 dark:text-pink-300">
+            {stage.label}
+          </span>
+        </div>
+        <span className="text-xs text-muted-foreground">
+          만개일 3/31
+        </span>
+      </div>
+      <div className="relative">
+        <Progress
+          value={percent}
+          className="h-4 rounded-full [&>div]:bg-gradient-to-r [&>div]:from-pink-300 [&>div]:to-pink-500 [&>div]:rounded-full"
+        />
+        <div className="absolute inset-0 flex items-center justify-center">
+          <span className="text-[10px] font-bold text-white drop-shadow-sm">
+            {percent}%
+          </span>
+        </div>
+      </div>
+      <div className="flex justify-between mt-1.5">
+        <div className="flex gap-0.5">
+          {["🌿", "🌱", "🌷", "🌸", "💐"].map((e, i) => (
+            <span
+              key={i}
+              className={`text-sm transition-opacity ${percent >= (i + 1) * 20 ? "opacity-100" : "opacity-20"}`}
+            >
+              {e}
+            </span>
+          ))}
+        </div>
+        <span className="text-[10px] text-muted-foreground">
+          {daysToFull > 0
+            ? `만개까지 ${daysToFull}일`
+            : daysToFull === 0
+              ? "오늘 만개!"
+              : "만개 중 🌸"}
+        </span>
+      </div>
+    </div>
+  );
+}
+
 export function SeasonTipsCard() {
   const { config } = useTripConfig();
 
@@ -178,6 +256,9 @@ export function SeasonTipsCard() {
               </li>
             ))}
           </ul>
+          {config.country === "JP" && month >= 3 && month <= 4 && (
+            <BloomStatus />
+          )}
         </CardContent>
       </div>
     </Card>
