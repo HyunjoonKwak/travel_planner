@@ -7,9 +7,11 @@ import { useTripConfig } from "@/hooks/use-trip-config";
 
 interface WeatherData {
   readonly temp: number;
+  readonly feelsLike: number;
   readonly condition: string;
   readonly icon: string;
   readonly humidity: number;
+  readonly windSpeed: number;
   readonly city: string;
 }
 
@@ -58,7 +60,7 @@ async function fetchWeather(
   lng: number,
   cityName: string,
 ): Promise<WeatherData> {
-  const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current=temperature_2m,relative_humidity_2m,weather_code&timezone=auto`;
+  const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m,apparent_temperature&timezone=auto`;
   const res = await globalThis.fetch(url);
   const data = await res.json();
   const current = data.current;
@@ -67,9 +69,11 @@ async function fetchWeather(
 
   return {
     temp: Math.round(current?.temperature_2m ?? 0),
+    feelsLike: Math.round(current?.apparent_temperature ?? 0),
     condition: wmo.condition,
     icon: wmo.icon,
     humidity: Math.round(current?.relative_humidity_2m ?? 0),
+    windSpeed: Math.round((current?.wind_speed_10m ?? 0) * 10) / 10,
     city: cityName,
   };
 }
@@ -147,7 +151,10 @@ export function WeatherExchangeCard() {
               </div>
             </div>
             <p className="text-xs text-muted-foreground">
-              습도 {weather?.humidity ?? 0}%
+              체감 {weather?.feelsLike ?? 0}°C · 습도 {weather?.humidity ?? 0}%
+            </p>
+            <p className="text-xs text-muted-foreground">
+              풍속 {weather?.windSpeed ?? 0}km/h
             </p>
           </div>
 
