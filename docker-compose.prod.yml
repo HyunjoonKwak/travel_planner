@@ -6,4 +6,6 @@ services:
       - "3900:3000"
     volumes:
       - ./data:/app/data
+    environment:
+      - GOOGLE_PLACES_API_KEY=${GOOGLE_PLACES_API_KEY}
     restart: unless-stopped

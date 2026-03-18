@@ -20,5 +20,5 @@ export interface FoodSearchRequest {
 
 export interface FoodSearchResponse {
   readonly results: ReadonlyArray<GooglePlaceResult>;
-  readonly status: "OK" | "ZERO_RESULTS" | "ERROR";
+  readonly status: "OK" | "ZERO_RESULTS" | "ERROR" | "NEED_MORE_INPUT" | "NO_API_KEY";
 }
