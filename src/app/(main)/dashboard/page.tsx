@@ -8,13 +8,14 @@ import { ExpenseSummary } from "@/components/dashboard/expense-summary";
 import { LearnProgress } from "@/components/dashboard/learn-progress";
 import { QuickMemo } from "@/components/dashboard/quick-memo";
 import { useActiveTrip } from "@/hooks/use-trip";
-import { useTripConfig } from "@/hooks/use-trip-config";
+import { useTripConfig, setActiveTripCache } from "@/hooks/use-trip-config";
 import { Loader2 } from "lucide-react";
 import Link from "next/link";
 import { buttonVariants } from "@/components/ui/button";
 
 export default function DashboardPage() {
   const { activeTrip, loading } = useActiveTrip();
+  setActiveTripCache(activeTrip);
   const { getTripName } = useTripConfig();
 
   if (loading) {

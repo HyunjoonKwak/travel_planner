@@ -1,7 +1,6 @@
 "use client";
 
 import { useLocalStorage } from "./use-local-storage";
-import { useActiveTrip } from "./use-trip";
 import { getCityById } from "@/lib/data/destinations";
 
 export interface FlightInfo {
@@ -121,17 +120,22 @@ function tripToConfig(trip: {
   };
 }
 
+// Cached active trip - set by pages that call useActiveTrip
+let _cachedTrip: (Parameters<typeof tripToConfig>[0] & { name?: string; id?: string }) | null = null;
+
+export function setActiveTripCache(trip: typeof _cachedTrip) {
+  _cachedTrip = trip;
+}
+
 export function useTripConfig() {
   const [rawConfig, setConfig] = useLocalStorage<LegacyTripConfig>(
     "trip-config",
     DEFAULT_CONFIG,
   );
 
-  const { activeTrip } = useActiveTrip();
-
-  // Use DB trip if available, fall back to localStorage
-  const config: TripConfig = activeTrip
-    ? tripToConfig(activeTrip)
+  // Use cached DB trip if available, fall back to localStorage
+  const config: TripConfig = _cachedTrip
+    ? tripToConfig(_cachedTrip)
     : migrateLegacy(rawConfig);
 
   function updateConfig(updates: Partial<TripConfig>) {
@@ -139,9 +143,8 @@ export function useTripConfig() {
   }
 
   function getTripName(): string {
-    // If DB trip exists, use its name directly
-    if (activeTrip?.name) {
-      return activeTrip.name;
+    if (_cachedTrip?.name) {
+      return String(_cachedTrip.name);
     }
 
     const cityNames = config.destinations
