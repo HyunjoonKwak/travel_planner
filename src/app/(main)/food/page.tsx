@@ -5,6 +5,7 @@ import { Search, Plus, Loader2, RefreshCw } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -19,7 +20,7 @@ import { FoodSearchDrawer } from "@/components/food/food-search-drawer";
 import { getFoodSpotsForCities } from "@/lib/data/food-registry";
 import { getCityById } from "@/lib/data/destinations";
 import { useLocalStorage } from "@/hooks/use-local-storage";
-import { useTripConfig } from "@/hooks/use-trip-config";
+import { useActiveTrip } from "@/hooks/use-trip";
 import { useRecommendations } from "@/hooks/use-recommendations";
 import type { FoodCategory, FoodSpot } from "@/types/food";
 import { FOOD_CATEGORY_CONFIG } from "@/types/food";
@@ -189,8 +190,13 @@ function FoodSection({
   );
 }
 
+function parseDest(raw: string | null | undefined): string[] {
+  if (!raw) return [];
+  try { return JSON.parse(raw) as string[]; } catch { return []; }
+}
+
 export default function FoodPage() {
-  const { config } = useTripConfig();
+  const { activeTrip, loading: tripLoading } = useActiveTrip();
   const [selectedCategory, setSelectedCategory] = useState<FilterCategory>("all");
   const [selectedCity, setSelectedCity] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
@@ -200,8 +206,27 @@ export default function FoodPage() {
 
   const [userSpots, setUserSpots] = useLocalStorage<FoodSpot[]>("user_food_spots", []);
 
-  const destinations = config.destinations ?? [];
-  const effectiveDestinations = destinations.length > 0 ? destinations : ["osaka"];
+  const destinations = parseDest(activeTrip?.destinations);
+  const effectiveDestinations = destinations.length > 0 ? destinations : [];
+
+  if (tripLoading) {
+    return (
+      <div className="px-4 py-6">
+        <RecommendationSkeleton />
+      </div>
+    );
+  }
+
+  if (!activeTrip) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 text-center px-4 min-h-screen">
+        <p className="text-3xl mb-3">🍜</p>
+        <p className="text-sm font-medium">여행이 설정되지 않았습니다</p>
+        <p className="text-xs text-muted-foreground mt-1 mb-4">설정에서 여행을 먼저 만들어주세요</p>
+        <a href="/settings"><Button size="sm" variant="outline">설정으로 이동</Button></a>
+      </div>
+    );
+  }
 
   // 1) 에디터 추천 (정적 데이터 - 미즈노, 잇치란 등)
   const curatedSpots = useMemo(

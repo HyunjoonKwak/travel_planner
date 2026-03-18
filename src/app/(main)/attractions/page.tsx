@@ -15,7 +15,7 @@ import {
 import { AttractionSearchDrawer } from "@/components/attractions/attraction-search-drawer";
 import { getCityById } from "@/lib/data/destinations";
 import { useLocalStorage } from "@/hooks/use-local-storage";
-import { useTripConfig } from "@/hooks/use-trip-config";
+import { useActiveTrip } from "@/hooks/use-trip";
 import { useRecommendations } from "@/hooks/use-recommendations";
 import type { RecommendationResult } from "@/types/recommendation";
 import type { GooglePlaceResult } from "@/types/food-search";
@@ -65,8 +65,13 @@ function placeToAttraction(
   };
 }
 
+function parseDest(raw: string | null | undefined): string[] {
+  if (!raw) return [];
+  try { return JSON.parse(raw) as string[]; } catch { return []; }
+}
+
 export default function AttractionsPage() {
-  const { config } = useTripConfig();
+  const { activeTrip, loading: tripLoading } = useActiveTrip();
 
   const [selectedCity, setSelectedCity] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
@@ -80,9 +85,23 @@ export default function AttractionsPage() {
     SavedAttraction[]
   >("user_attractions", []);
 
-  const destinations = config.destinations ?? [];
-  const effectiveDestinations =
-    destinations.length > 0 ? destinations : ["osaka"];
+  const destinations = parseDest(activeTrip?.destinations);
+  const effectiveDestinations = destinations.length > 0 ? destinations : [];
+
+  if (tripLoading) {
+    return <div className="px-4 py-6 space-y-3"><div className="h-32 w-full bg-muted rounded-lg animate-pulse" /></div>;
+  }
+
+  if (!activeTrip) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 text-center px-4 min-h-screen">
+        <p className="text-3xl mb-3">🏯</p>
+        <p className="text-sm font-medium">여행이 설정되지 않았습니다</p>
+        <p className="text-xs text-muted-foreground mt-1 mb-4">설정에서 여행을 먼저 만들어주세요</p>
+        <a href="/settings"><button className="text-sm border rounded-lg px-4 py-2 hover:bg-muted transition-colors">설정으로 이동</button></a>
+      </div>
+    );
+  }
 
   const {
     items: recommendedItems,
