@@ -47,6 +47,21 @@ export const FLIGHT_ROUTES: ReadonlyArray<FlightRoute> = [
   // Peach - Osaka
   { flightNumber: "MM12", airline: "피치항공", departureAirport: "ICN", departureCity: "인천", arrivalAirport: "KIX", arrivalCity: "오사카", departureTime: "11:30", arrivalTime: "13:25" },
   { flightNumber: "MM11", airline: "피치항공", departureAirport: "KIX", departureCity: "오사카", arrivalAirport: "ICN", arrivalCity: "인천", departureTime: "08:15", arrivalTime: "10:15" },
+  // Eastar Jet - Osaka
+  { flightNumber: "ZE611", airline: "이스타항공", departureAirport: "ICN", departureCity: "인천", arrivalAirport: "KIX", arrivalCity: "오사카", departureTime: "08:20", arrivalTime: "10:15" },
+  { flightNumber: "ZE612", airline: "이스타항공", departureAirport: "KIX", departureCity: "오사카", arrivalAirport: "ICN", arrivalCity: "인천", departureTime: "11:15", arrivalTime: "13:15" },
+  // Eastar Jet - Fukuoka
+  { flightNumber: "ZE631", airline: "이스타항공", departureAirport: "ICN", departureCity: "인천", arrivalAirport: "FUK", arrivalCity: "후쿠오카", departureTime: "09:30", arrivalTime: "11:00" },
+  { flightNumber: "ZE632", airline: "이스타항공", departureAirport: "FUK", departureCity: "후쿠오카", arrivalAirport: "ICN", arrivalCity: "인천", departureTime: "12:00", arrivalTime: "13:30" },
+  // Eastar Jet - Tokyo NRT
+  { flightNumber: "ZE601", airline: "이스타항공", departureAirport: "ICN", departureCity: "인천", arrivalAirport: "NRT", arrivalCity: "도쿄", departureTime: "10:10", arrivalTime: "12:35" },
+  { flightNumber: "ZE602", airline: "이스타항공", departureAirport: "NRT", departureCity: "도쿄", arrivalAirport: "ICN", arrivalCity: "인천", departureTime: "13:40", arrivalTime: "16:20" },
+  // Fly Gangwon (플라이강원/피라타) - Osaka
+  { flightNumber: "4V801", airline: "플라이강원", departureAirport: "ICN", departureCity: "인천", arrivalAirport: "KIX", arrivalCity: "오사카", departureTime: "07:50", arrivalTime: "09:45" },
+  { flightNumber: "4V802", airline: "플라이강원", departureAirport: "KIX", departureCity: "오사카", arrivalAirport: "ICN", arrivalCity: "인천", departureTime: "10:45", arrivalTime: "12:45" },
+  // Fly Gangwon - Fukuoka
+  { flightNumber: "4V811", airline: "플라이강원", departureAirport: "ICN", departureCity: "인천", arrivalAirport: "FUK", arrivalCity: "후쿠오카", departureTime: "08:30", arrivalTime: "10:00" },
+  { flightNumber: "4V812", airline: "플라이강원", departureAirport: "FUK", departureCity: "후쿠오카", arrivalAirport: "ICN", arrivalCity: "인천", departureTime: "11:00", arrivalTime: "12:30" },
   // Korean Air - Sapporo
   { flightNumber: "KE765", airline: "대한항공", departureAirport: "ICN", departureCity: "인천", arrivalAirport: "CTS", arrivalCity: "삿포로", departureTime: "10:00", arrivalTime: "12:50" },
   { flightNumber: "KE766", airline: "대한항공", departureAirport: "CTS", departureCity: "삿포로", arrivalAirport: "ICN", arrivalCity: "인천", departureTime: "14:00", arrivalTime: "17:10" },
