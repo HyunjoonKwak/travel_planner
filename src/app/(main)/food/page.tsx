@@ -16,6 +16,7 @@ import {
 import { FoodCard } from "@/components/food/food-card";
 import { FoodDetail } from "@/components/food/food-detail";
 import { FoodSearchDrawer } from "@/components/food/food-search-drawer";
+import { getFoodSpotsForCities } from "@/lib/data/food-registry";
 import { getCityById } from "@/lib/data/destinations";
 import { useLocalStorage } from "@/hooks/use-local-storage";
 import { useTripConfig } from "@/hooks/use-trip-config";
@@ -39,12 +40,47 @@ function normalizeKo(str: string): string {
   return str.toLowerCase().replace(/\s+/g, "");
 }
 
+const TYPE_TO_CATEGORY: Record<string, FoodCategory> = {
+  ramen: "ramen",
+  noodle_restaurant: "ramen",
+  sushi_restaurant: "sushi",
+  seafood_restaurant: "sushi",
+  japanese_restaurant: "other",
+  korean_restaurant: "other",
+  chinese_restaurant: "other",
+  italian_restaurant: "other",
+  steak_house: "yakiniku",
+  barbecue_restaurant: "yakiniku",
+  cafe: "cafe",
+  coffee_shop: "cafe",
+  bakery: "cafe",
+  meal_takeaway: "other",
+};
+
+function guessCategory(types: ReadonlyArray<string>, name: string): FoodCategory {
+  for (const t of types) {
+    const mapped = TYPE_TO_CATEGORY[t];
+    if (mapped) return mapped;
+  }
+  const n = name.toLowerCase();
+  if (n.includes("라멘") || n.includes("ラーメン") || n.includes("麺")) return "ramen";
+  if (n.includes("타코야키") || n.includes("たこ焼")) return "takoyaki";
+  if (n.includes("오코노미") || n.includes("お好み")) return "okonomiyaki";
+  if (n.includes("쿠시") || n.includes("串カツ")) return "kushikatsu";
+  if (n.includes("스시") || n.includes("寿司") || n.includes("鮨")) return "sushi";
+  if (n.includes("우동") || n.includes("うどん") || n.includes("そば")) return "udon";
+  if (n.includes("야키니쿠") || n.includes("焼肉") || n.includes("焼き肉")) return "yakiniku";
+  if (n.includes("카페") || n.includes("커피") || n.includes("コーヒー") || n.includes("カフェ")) return "cafe";
+  return "other";
+}
+
 function recommendationToFoodSpot(item: RecommendationResult): FoodSpot {
+  const category = guessCategory(item.types ?? [], `${item.name} ${item.nameJa}`);
   return {
     id: `rec_${item.placeId}`,
     name: item.name,
     nameJa: item.nameJa,
-    category: "other",
+    category,
     area: item.cityName,
     address: item.address,
     addressJa: item.address,
@@ -63,11 +99,12 @@ function recommendationToFoodSpot(item: RecommendationResult): FoodSpot {
 }
 
 function placeToFoodSpot(place: GooglePlaceResult, cityName: string): FoodSpot {
+  const category = guessCategory(place.types as string[], `${place.name} ${place.nameJa ?? ""}`);
   return {
     id: `google_${place.placeId}`,
     name: place.name,
     nameJa: place.nameJa ?? place.name,
-    category: "other",
+    category,
     area: cityName,
     address: place.address,
     addressJa: place.address,
@@ -98,56 +135,89 @@ function RecommendationSkeleton() {
   );
 }
 
+function FoodSection({
+  title,
+  badge,
+  spots,
+  onCardClick,
+  emptyMessage,
+  emptyIcon,
+  action,
+}: {
+  title: string;
+  badge?: React.ReactNode;
+  spots: FoodSpot[];
+  onCardClick: (spot: FoodSpot) => void;
+  emptyMessage: string;
+  emptyIcon: string;
+  action?: React.ReactNode;
+}) {
+  return (
+    <section>
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <h2 className="text-sm font-semibold">{title}</h2>
+          {badge}
+        </div>
+        {action}
+      </div>
+      {spots.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-8 text-center border rounded-lg bg-muted/20">
+          <p className="text-2xl mb-2">{emptyIcon}</p>
+          <p className="text-muted-foreground text-xs">{emptyMessage}</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          {spots.map((spot) => (
+            <FoodCard key={spot.id} spot={spot} onClick={() => onCardClick(spot)} />
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
 export default function FoodPage() {
   const { config } = useTripConfig();
-
-  const [selectedCategory, setSelectedCategory] =
-    useState<FilterCategory>("all");
+  const [selectedCategory, setSelectedCategory] = useState<FilterCategory>("all");
   const [selectedCity, setSelectedCity] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedSpot, setSelectedSpot] = useState<FoodSpot | null>(null);
   const [detailDrawerOpen, setDetailDrawerOpen] = useState(false);
   const [addDrawerOpen, setAddDrawerOpen] = useState(false);
 
-  const [userSpots, setUserSpots] = useLocalStorage<FoodSpot[]>(
-    "user_food_spots",
-    []
-  );
+  const [userSpots, setUserSpots] = useLocalStorage<FoodSpot[]>("user_food_spots", []);
 
   const destinations = config.destinations ?? [];
-  const effectiveDestinations =
-    destinations.length > 0 ? destinations : ["osaka"];
+  const effectiveDestinations = destinations.length > 0 ? destinations : ["osaka"];
 
-  const {
-    items: recommendedItems,
-    loading: recLoading,
-    refresh: recRefresh,
-  } = useRecommendations({
-    cities: effectiveDestinations,
-    type: "food",
-  });
-
-  const recommendedSpots = useMemo(
-    () => recommendedItems.map(recommendationToFoodSpot),
-    [recommendedItems]
+  // 1) 에디터 추천 (정적 데이터 - 미즈노, 잇치란 등)
+  const curatedSpots = useMemo(
+    () => [...getFoodSpotsForCities(effectiveDestinations)],
+    [effectiveDestinations],
   );
 
+  // 2) Google 추천 (API 자동 검색)
+  const { items: recommendedItems, loading: recLoading, refresh: recRefresh } =
+    useRecommendations({ cities: effectiveDestinations, type: "food" });
+
+  const googleSpots = useMemo(
+    () => recommendedItems.map(recommendationToFoodSpot),
+    [recommendedItems],
+  );
+
+  // 3) 도시 목록
   const selectedCities = useMemo(
-    () =>
-      effectiveDestinations
-        .map((id) => getCityById(id))
-        .filter((c): c is NonNullable<typeof c> => c !== undefined),
-    [effectiveDestinations]
+    () => effectiveDestinations.map((id) => getCityById(id)).filter((c): c is NonNullable<typeof c> => !!c),
+    [effectiveDestinations],
   );
 
   const addedPlaceIds: Set<string> = useMemo(
-    () =>
-      new Set<string>(
-        userSpots.map((s) => s.placeId).filter((id): id is string => !!id)
-      ),
-    [userSpots]
+    () => new Set<string>(userSpots.map((s) => s.placeId).filter((id): id is string => !!id)),
+    [userSpots],
   );
 
+  // 필터 함수
   function applyFilters(spots: FoodSpot[]): FoodSpot[] {
     const query = normalizeKo(searchQuery);
     return spots.filter((spot) => {
@@ -166,24 +236,27 @@ export default function FoodPage() {
     });
   }
 
-  const filteredRecommended = useMemo(
-    () => applyFilters(recommendedSpots),
+  const filteredCurated = useMemo(
+    () => applyFilters(curatedSpots),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [selectedCity, selectedCategory, searchQuery, recommendedSpots]
+    [selectedCity, selectedCategory, searchQuery, curatedSpots],
   );
-
-  const filteredUserSpots = useMemo(
+  const filteredGoogle = useMemo(
+    () => applyFilters(googleSpots),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [selectedCity, selectedCategory, searchQuery, googleSpots],
+  );
+  const filteredUser = useMemo(
     () => applyFilters(userSpots),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [selectedCity, selectedCategory, searchQuery, userSpots]
+    [selectedCity, selectedCategory, searchQuery, userSpots],
   );
 
   function handleAddPlace(place: GooglePlaceResult) {
-    const currentCityName = selectedCities[0]?.name ?? "오사카";
-    const spot = placeToFoodSpot(place, currentCityName);
+    const cityName = selectedCities[0]?.name ?? "오사카";
+    const spot = placeToFoodSpot(place, cityName);
     setUserSpots((prev) => {
-      const alreadyExists = prev.some((s) => s.placeId === place.placeId);
-      if (alreadyExists) return prev;
+      if (prev.some((s) => s.placeId === place.placeId)) return prev;
       return [...prev, spot];
     });
   }
@@ -193,13 +266,8 @@ export default function FoodPage() {
     setDetailDrawerOpen(true);
   }
 
-  function handleDetailClose() {
-    setDetailDrawerOpen(false);
-    setSelectedSpot(null);
-  }
-
   const cityLabel = selectedCities.map((c) => c.name).join(" · ");
-  const totalCount = filteredRecommended.length + filteredUserSpots.length;
+  const totalCount = filteredCurated.length + filteredGoogle.length + filteredUser.length;
 
   return (
     <div className="min-h-screen">
@@ -215,42 +283,25 @@ export default function FoodPage() {
                 className="pl-9"
               />
             </div>
-            <Button
-              size="sm"
-              className="shrink-0 gap-1.5"
-              onClick={() => setAddDrawerOpen(true)}
-            >
+            <Button size="sm" className="shrink-0 gap-1.5" onClick={() => setAddDrawerOpen(true)}>
               <Search className="h-3.5 w-3.5" />
               <Plus className="h-3.5 w-3.5" />
-              <span className="text-xs">맛집 검색 추가</span>
+              <span className="text-xs">검색 추가</span>
             </Button>
           </div>
 
           <p className="text-xs text-muted-foreground mb-2">
-            {cityLabel
-              ? `${cityLabel} 맛집 ${totalCount}개`
-              : `맛집 ${totalCount}개`}
+            {cityLabel ? `${cityLabel} 맛집 ${totalCount}개` : `맛집 ${totalCount}개`}
           </p>
 
           {selectedCities.length > 1 && (
-            <Tabs
-              value={selectedCity}
-              onValueChange={(v) => setSelectedCity(v)}
-              className="mb-2"
-            >
+            <Tabs value={selectedCity} onValueChange={setSelectedCity} className="mb-2">
               <TabsList className="flex h-auto gap-1 bg-transparent p-0 overflow-x-auto w-full justify-start">
-                <TabsTrigger
-                  value="all"
-                  className="shrink-0 rounded-full border data-[state=active]:bg-secondary data-[state=active]:text-secondary-foreground text-xs px-3 py-1.5"
-                >
+                <TabsTrigger value="all" className="shrink-0 rounded-full border data-[state=active]:bg-secondary data-[state=active]:text-secondary-foreground text-xs px-3 py-1.5">
                   전체
                 </TabsTrigger>
                 {selectedCities.map((city) => (
-                  <TabsTrigger
-                    key={city.id}
-                    value={city.id}
-                    className="shrink-0 rounded-full border data-[state=active]:bg-secondary data-[state=active]:text-secondary-foreground text-xs px-3 py-1.5"
-                  >
+                  <TabsTrigger key={city.id} value={city.id} className="shrink-0 rounded-full border data-[state=active]:bg-secondary data-[state=active]:text-secondary-foreground text-xs px-3 py-1.5">
                     {city.name}
                   </TabsTrigger>
                 ))}
@@ -258,17 +309,10 @@ export default function FoodPage() {
             </Tabs>
           )}
 
-          <Tabs
-            value={selectedCategory}
-            onValueChange={(v) => setSelectedCategory(v as FilterCategory)}
-          >
+          <Tabs value={selectedCategory} onValueChange={(v) => setSelectedCategory(v as FilterCategory)}>
             <TabsList className="flex h-auto gap-1 bg-transparent p-0 overflow-x-auto w-full justify-start">
               {CATEGORY_FILTERS.map(({ key, label }) => (
-                <TabsTrigger
-                  key={key}
-                  value={key}
-                  className="shrink-0 rounded-full border data-[state=active]:bg-primary data-[state=active]:text-primary-foreground text-xs px-3 py-1.5"
-                >
+                <TabsTrigger key={key} value={key} className="shrink-0 rounded-full border data-[state=active]:bg-primary data-[state=active]:text-primary-foreground text-xs px-3 py-1.5">
                   {label}
                 </TabsTrigger>
               ))}
@@ -278,118 +322,72 @@ export default function FoodPage() {
       </div>
 
       <div className="px-4 py-4 space-y-6">
-        {/* 추천 맛집 section */}
+        {/* 에디터 추천 (정적 데이터) */}
+        {curatedSpots.length > 0 && (
+          <FoodSection
+            title="에디터 추천"
+            badge={<Badge variant="outline" className="text-[10px]">직접 선정</Badge>}
+            spots={filteredCurated}
+            onCardClick={handleCardClick}
+            emptyMessage="필터에 맞는 에디터 추천이 없습니다"
+            emptyIcon="⭐"
+          />
+        )}
+
+        {curatedSpots.length > 0 && <Separator />}
+
+        {/* Google 추천 */}
         <section>
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
-              <h2 className="text-sm font-semibold">추천 맛집</h2>
-              <div className="flex gap-1">
-                {selectedCities.map((city) => (
-                  <Badge key={city.id} variant="secondary" className="text-xs">
-                    {city.name}
-                  </Badge>
-                ))}
-              </div>
+              <h2 className="text-sm font-semibold">인기 맛집</h2>
+              <Badge variant="outline" className="text-[10px]">Google 추천</Badge>
             </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 gap-1 text-xs"
-              onClick={recRefresh}
-              disabled={recLoading}
-            >
-              {recLoading ? (
-                <Loader2 className="h-3 w-3 animate-spin" />
-              ) : (
-                <RefreshCw className="h-3 w-3" />
-              )}
+            <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs" onClick={recRefresh} disabled={recLoading}>
+              {recLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
               새로고침
             </Button>
           </div>
-
           {recLoading ? (
             <RecommendationSkeleton />
-          ) : filteredRecommended.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-10 text-center border rounded-lg bg-muted/20">
-              <p className="text-3xl mb-2">🍽</p>
-              <p className="text-muted-foreground text-sm">
-                {searchQuery || selectedCategory !== "all"
-                  ? "필터에 맞는 추천 맛집이 없습니다"
-                  : "추천 맛집을 불러오는 중..."}
-              </p>
-            </div>
           ) : (
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              {filteredRecommended.map((spot) => (
-                <FoodCard
-                  key={spot.id}
-                  spot={spot}
-                  onClick={() => handleCardClick(spot)}
-                />
-              ))}
-            </div>
+            <FoodSection
+              title=""
+              spots={filteredGoogle}
+              onCardClick={handleCardClick}
+              emptyMessage="필터에 맞는 추천 맛집이 없습니다"
+              emptyIcon="🍽"
+            />
           )}
         </section>
 
         <Separator />
 
-        {/* 내가 추가한 맛집 section */}
-        <section>
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-sm font-semibold">
-              내가 추가한 맛집
-              {userSpots.length > 0 && (
-                <span className="ml-1.5 text-xs font-normal text-muted-foreground">
-                  {filteredUserSpots.length}개
-                </span>
-              )}
-            </h2>
-          </div>
-
-          {filteredUserSpots.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-10 text-center border rounded-lg bg-muted/20">
-              <p className="text-3xl mb-2">🔖</p>
-              <p className="text-muted-foreground text-sm">
-                {userSpots.length === 0
-                  ? "아직 추가한 맛집이 없어요"
-                  : "필터에 맞는 맛집이 없습니다"}
-              </p>
-              {userSpots.length === 0 && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="mt-3 gap-1.5"
-                  onClick={() => setAddDrawerOpen(true)}
-                >
-                  <Plus className="h-3.5 w-3.5" />
-                  맛집 추가하기
-                </Button>
-              )}
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              {filteredUserSpots.map((spot) => (
-                <FoodCard
-                  key={spot.id}
-                  spot={spot}
-                  onClick={() => handleCardClick(spot)}
-                />
-              ))}
-            </div>
-          )}
-        </section>
+        {/* 내가 추가한 맛집 */}
+        <FoodSection
+          title="내가 추가한 맛집"
+          badge={userSpots.length > 0 ? <span className="text-xs text-muted-foreground">{filteredUser.length}개</span> : undefined}
+          spots={filteredUser}
+          onCardClick={handleCardClick}
+          emptyMessage="아직 추가한 맛집이 없어요. 검색 추가 버튼을 눌러보세요."
+          emptyIcon="🔖"
+          action={
+            userSpots.length === 0 ? (
+              <Button variant="outline" size="sm" className="h-7 gap-1 text-xs" onClick={() => setAddDrawerOpen(true)}>
+                <Plus className="h-3 w-3" /> 추가
+              </Button>
+            ) : undefined
+          }
+        />
       </div>
 
-      {/* Food detail drawer */}
       <Drawer open={detailDrawerOpen} onOpenChange={setDetailDrawerOpen}>
         <DrawerContent>
           <DrawerHeader className="sr-only">
             <DrawerTitle>{selectedSpot?.name ?? "맛집 상세"}</DrawerTitle>
           </DrawerHeader>
           <div className="px-4 pb-8 overflow-y-auto max-h-[80vh]">
-            {selectedSpot && (
-              <FoodDetail spot={selectedSpot} onClose={handleDetailClose} />
-            )}
+            {selectedSpot && <FoodDetail spot={selectedSpot} onClose={() => { setDetailDrawerOpen(false); setSelectedSpot(null); }} />}
           </div>
         </DrawerContent>
       </Drawer>
