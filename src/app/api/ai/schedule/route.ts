@@ -65,7 +65,7 @@ ${body.preferences ? `- 요청사항: ${body.preferences}` : ""}
 위 정보로 상세 여행 일정을 JSON 배열로 생성해주세요.`;
 
     const completion = await openai.chat.completions.create({
-      model: process.env.OPENAI_MODEL ?? "gpt-4.1",
+      model: process.env.OPENAI_MODEL ?? "gpt-5.4-mini",
       messages: [
         { role: "system", content: SYSTEM_PROMPT },
         { role: "user", content: userPrompt },
