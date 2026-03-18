@@ -12,7 +12,7 @@ export default function AttractionsError({
 }) {
   useEffect(() => {
     if (typeof window !== "undefined") {
-      (window as Record<string, unknown>).__attractions_error = error.message;
+      (window as unknown as Record<string, unknown>).__attractions_error = error.message;
     }
   }, [error]);
 

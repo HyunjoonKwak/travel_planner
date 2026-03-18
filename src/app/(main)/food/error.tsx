@@ -13,7 +13,7 @@ export default function FoodError({
   useEffect(() => {
     // Log error for debugging
     if (typeof window !== "undefined") {
-      (window as Record<string, unknown>).__food_error = error.message;
+      (window as unknown as Record<string, unknown>).__food_error = error.message;
     }
   }, [error]);
 
