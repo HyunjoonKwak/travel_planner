@@ -1,10 +1,20 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { Search, Plus, Loader2, MapPin, Star, RefreshCw } from "lucide-react";
+import {
+  Search,
+  Plus,
+  Loader2,
+  MapPin,
+  Star,
+  ExternalLink,
+  RefreshCw,
+  CalendarPlus,
+} from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
@@ -14,88 +24,180 @@ import {
   DrawerHeader,
   DrawerTitle,
 } from "@/components/ui/drawer";
-import { FoodCard } from "@/components/food/food-card";
-import { FoodDetail } from "@/components/food/food-detail";
 import { getCityById } from "@/lib/data/destinations";
 import { useLocalStorage } from "@/hooks/use-local-storage";
 import { useTripConfig } from "@/hooks/use-trip-config";
 import { useRecommendations } from "@/hooks/use-recommendations";
-import type { FoodCategory, FoodSpot } from "@/types/food";
-import { FOOD_CATEGORY_CONFIG } from "@/types/food";
-import type { GooglePlaceResult } from "@/types/food-search";
 import type { RecommendationResult } from "@/types/recommendation";
+import type { GooglePlaceResult } from "@/types/food-search";
 import { cn } from "@/lib/utils";
 
-type FilterCategory = "all" | FoodCategory;
-
-const CATEGORY_FILTERS: { key: FilterCategory; label: string }[] = [
-  { key: "all", label: "전체" },
-  ...Object.entries(FOOD_CATEGORY_CONFIG).map(([key, config]) => ({
-    key: key as FoodCategory,
-    label: config.label,
-  })),
-];
+interface SavedAttraction {
+  readonly placeId: string;
+  readonly name: string;
+  readonly nameJa: string;
+  readonly address: string;
+  readonly rating: number;
+  readonly reviewCount: number;
+  readonly city: string;
+  readonly cityName: string;
+  readonly googleMapsUrl?: string;
+  readonly openNow?: boolean;
+  readonly lat?: number;
+  readonly lng?: number;
+  readonly source: "recommendation" | "user";
+}
 
 function normalizeKo(str: string): string {
   return str.toLowerCase().replace(/\s+/g, "");
 }
 
-function recommendationToFoodSpot(item: RecommendationResult): FoodSpot {
+function recommendationToAttraction(
+  item: RecommendationResult
+): SavedAttraction {
   return {
-    id: `rec_${item.placeId}`,
+    placeId: item.placeId,
     name: item.name,
     nameJa: item.nameJa,
-    category: "other",
-    area: item.cityName,
     address: item.address,
-    addressJa: item.address,
     rating: item.rating,
-    priceRange: "가격 미상",
-    hours: "영업시간 미등록",
-    recommendedMenu: [],
-    visited: false,
+    reviewCount: item.reviewCount,
+    city: item.city,
+    cityName: item.cityName,
+    googleMapsUrl: item.googleMapsUrl,
+    openNow: item.openNow,
     lat: item.lat,
     lng: item.lng,
-    googleRating: item.rating,
-    googleReviewCount: item.reviewCount,
-    placeId: item.placeId,
-    mapUrl: item.googleMapsUrl,
+    source: "recommendation",
   };
 }
 
-function placeToFoodSpot(place: GooglePlaceResult, cityName: string): FoodSpot {
+function placeToAttraction(
+  place: GooglePlaceResult,
+  city: string,
+  cityName: string
+): SavedAttraction {
   return {
-    id: `google_${place.placeId}`,
+    placeId: place.placeId,
     name: place.name,
     nameJa: place.nameJa ?? place.name,
-    category: "other",
-    area: cityName,
     address: place.address,
-    addressJa: place.address,
     rating: place.rating,
-    priceRange: place.priceLevel ? "¥".repeat(place.priceLevel) : "가격 미상",
-    hours: "영업시간 미등록",
-    recommendedMenu: [],
-    visited: false,
+    reviewCount: place.userRatingsTotal,
+    city,
+    cityName,
+    openNow: place.openNow,
     lat: place.lat,
     lng: place.lng,
-    googleRating: place.rating,
-    googleReviewCount: place.userRatingsTotal,
-    placeId: place.placeId,
+    source: "user",
   };
 }
 
-function RecommendationSkeleton() {
+function AttractionCard({
+  attraction,
+  onSchedule,
+  scheduled,
+}: {
+  attraction: SavedAttraction;
+  onSchedule: (a: SavedAttraction) => void;
+  scheduled: boolean;
+}) {
   return (
-    <div className="space-y-3">
-      {[1, 2, 3].map((n) => (
-        <div key={n} className="p-3 border rounded-lg space-y-2">
-          <Skeleton className="h-4 w-3/4" />
-          <Skeleton className="h-3 w-1/2" />
-          <Skeleton className="h-3 w-2/3" />
+    <Card className="overflow-hidden">
+      <CardContent className="p-3">
+        <div className="flex items-start justify-between gap-2 mb-1">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="font-medium text-sm truncate">{attraction.name}</span>
+              {attraction.openNow !== undefined && (
+                <Badge
+                  variant="outline"
+                  className={cn(
+                    "text-[10px] px-1 py-0 shrink-0",
+                    attraction.openNow
+                      ? "text-green-600 border-green-300"
+                      : "text-muted-foreground"
+                  )}
+                >
+                  {attraction.openNow ? "영업중" : "영업종료"}
+                </Badge>
+              )}
+            </div>
+            {attraction.nameJa && attraction.nameJa !== attraction.name && (
+              <p className="text-xs text-muted-foreground">{attraction.nameJa}</p>
+            )}
+          </div>
+          <Badge variant="secondary" className="text-xs shrink-0">
+            {attraction.cityName}
+          </Badge>
         </div>
-      ))}
-    </div>
+
+        <div className="flex items-center gap-3 text-xs text-muted-foreground mb-1.5">
+          {attraction.rating > 0 && (
+            <div className="flex items-center gap-1">
+              <Star className="h-3 w-3 fill-blue-500 text-blue-500" />
+              <span className="text-blue-600 dark:text-blue-400 font-medium">
+                {attraction.rating.toFixed(1)}
+              </span>
+              {attraction.reviewCount > 0 && (
+                <span>({attraction.reviewCount.toLocaleString()})</span>
+              )}
+            </div>
+          )}
+        </div>
+
+        <div className="flex items-start gap-1 mb-2 text-xs text-muted-foreground">
+          <MapPin className="h-3 w-3 shrink-0 mt-0.5" />
+          <span className="line-clamp-1">{attraction.address}</span>
+        </div>
+
+        <div className="flex gap-2">
+          {attraction.googleMapsUrl && (
+            <a
+              href={attraction.googleMapsUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex-1"
+            >
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full h-7 text-xs gap-1"
+              >
+                <ExternalLink className="h-3 w-3" />
+                지도 보기
+              </Button>
+            </a>
+          )}
+          <Button
+            variant={scheduled ? "secondary" : "default"}
+            size="sm"
+            className="flex-1 h-7 text-xs gap-1"
+            onClick={() => onSchedule(attraction)}
+            disabled={scheduled}
+          >
+            <CalendarPlus className="h-3 w-3" />
+            {scheduled ? "저장됨" : "일정에 추가"}
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function AttractionSkeleton() {
+  return (
+    <Card>
+      <CardContent className="p-3 space-y-2">
+        <Skeleton className="h-4 w-3/4" />
+        <Skeleton className="h-3 w-1/2" />
+        <Skeleton className="h-3 w-2/3" />
+        <div className="flex gap-2">
+          <Skeleton className="h-7 flex-1" />
+          <Skeleton className="h-7 flex-1" />
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -138,7 +240,6 @@ function SearchResultItem({
             </span>
             <span>({place.userRatingsTotal.toLocaleString()})</span>
           </div>
-          {place.priceLevel && <span>{"¥".repeat(place.priceLevel)}</span>}
         </div>
         <div className="flex items-start gap-1 mt-1 text-xs text-muted-foreground">
           <MapPin className="h-3 w-3 shrink-0 mt-0.5" />
@@ -171,15 +272,11 @@ function SearchResultSkeleton() {
   );
 }
 
-export default function FoodPage() {
+export default function AttractionsPage() {
   const { config } = useTripConfig();
 
-  const [selectedCategory, setSelectedCategory] =
-    useState<FilterCategory>("all");
   const [selectedCity, setSelectedCity] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedSpot, setSelectedSpot] = useState<FoodSpot | null>(null);
-  const [drawerOpen, setDrawerOpen] = useState(false);
 
   const [addDrawerOpen, setAddDrawerOpen] = useState(false);
   const [addSearchQuery, setAddSearchQuery] = useState("");
@@ -189,10 +286,13 @@ export default function FoodPage() {
   const [isSearching, setIsSearching] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
 
-  const [userSpots, setUserSpots] = useLocalStorage<FoodSpot[]>(
-    "user_food_spots",
-    []
-  );
+  const [savedAttractionIds, setSavedAttractionIds] = useLocalStorage<
+    string[]
+  >("scheduled_attraction_ids", []);
+
+  const [userAttractions, setUserAttractions] = useLocalStorage<
+    SavedAttraction[]
+  >("user_attractions", []);
 
   const destinations = config.destinations ?? [];
   const effectiveDestinations =
@@ -204,13 +304,8 @@ export default function FoodPage() {
     refresh: recRefresh,
   } = useRecommendations({
     cities: effectiveDestinations,
-    type: "food",
+    type: "attraction",
   });
-
-  const recommendedSpots = useMemo(
-    () => recommendedItems.map(recommendationToFoodSpot),
-    [recommendedItems]
-  );
 
   const selectedCities = useMemo(
     () =>
@@ -220,40 +315,52 @@ export default function FoodPage() {
     [effectiveDestinations]
   );
 
-  const addedPlaceIds = useMemo(
-    () => new Set(userSpots.map((s) => s.placeId).filter(Boolean)),
-    [userSpots]
+  const recommendedAttractions = useMemo(
+    () => recommendedItems.map(recommendationToAttraction),
+    [recommendedItems]
   );
 
-  function applyFilters(spots: FoodSpot[]): FoodSpot[] {
+  const addedPlaceIds = useMemo(
+    () => new Set(userAttractions.map((a) => a.placeId)),
+    [userAttractions]
+  );
+
+  const scheduledSet = useMemo(
+    () => new Set(savedAttractionIds),
+    [savedAttractionIds]
+  );
+
+  function applyFilters(attractions: SavedAttraction[]): SavedAttraction[] {
     const query = normalizeKo(searchQuery);
-    return spots.filter((spot) => {
-      const matchesCity =
-        selectedCity === "all" ||
-        getCityById(selectedCity)?.name === spot.area ||
-        spot.area.includes(getCityById(selectedCity)?.name ?? "__none__");
-      const matchesCategory =
-        selectedCategory === "all" || spot.category === selectedCategory;
+    return attractions.filter((a) => {
+      const matchesCity = selectedCity === "all" || a.city === selectedCity;
       const matchesSearch =
         !query ||
-        normalizeKo(spot.name).includes(query) ||
-        normalizeKo(spot.nameJa).includes(query) ||
-        normalizeKo(spot.area).includes(query);
-      return matchesCity && matchesCategory && matchesSearch;
+        normalizeKo(a.name).includes(query) ||
+        normalizeKo(a.nameJa).includes(query) ||
+        normalizeKo(a.cityName).includes(query);
+      return matchesCity && matchesSearch;
     });
   }
 
   const filteredRecommended = useMemo(
-    () => applyFilters(recommendedSpots),
+    () => applyFilters(recommendedAttractions),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [selectedCity, selectedCategory, searchQuery, recommendedSpots]
+    [selectedCity, searchQuery, recommendedAttractions]
   );
 
-  const filteredUserSpots = useMemo(
-    () => applyFilters(userSpots),
+  const filteredUserAttractions = useMemo(
+    () => applyFilters(userAttractions),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [selectedCity, selectedCategory, searchQuery, userSpots]
+    [selectedCity, searchQuery, userAttractions]
   );
+
+  function handleSchedule(attraction: SavedAttraction) {
+    setSavedAttractionIds((prev) => {
+      if (prev.includes(attraction.placeId)) return prev;
+      return [...prev, attraction.placeId];
+    });
+  }
 
   async function handleSearch() {
     if (!addSearchQuery.trim()) return;
@@ -263,7 +370,7 @@ export default function FoodPage() {
       const res = await fetch("/api/food/search", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: addSearchQuery.trim() }),
+        body: JSON.stringify({ query: `${addSearchQuery.trim()} 관광` }),
       });
       if (!res.ok) throw new Error("Search failed");
       const data = await res.json();
@@ -278,23 +385,15 @@ export default function FoodPage() {
   }
 
   function handleAddPlace(place: GooglePlaceResult) {
-    const currentCityName = selectedCities[0]?.name ?? "오사카";
-    const spot = placeToFoodSpot(place, currentCityName);
-    setUserSpots((prev) => {
-      const alreadyExists = prev.some((s) => s.placeId === place.placeId);
+    const firstCity = selectedCities[0];
+    const city = firstCity?.id ?? "osaka";
+    const cityName = firstCity?.name ?? "오사카";
+    const attraction = placeToAttraction(place, city, cityName);
+    setUserAttractions((prev) => {
+      const alreadyExists = prev.some((a) => a.placeId === place.placeId);
       if (alreadyExists) return prev;
-      return [...prev, spot];
+      return [...prev, attraction];
     });
-  }
-
-  function handleCardClick(spot: FoodSpot) {
-    setSelectedSpot(spot);
-    setDrawerOpen(true);
-  }
-
-  function handleClose() {
-    setDrawerOpen(false);
-    setSelectedSpot(null);
   }
 
   function handleAddDrawerClose() {
@@ -305,7 +404,7 @@ export default function FoodPage() {
   }
 
   const cityLabel = selectedCities.map((c) => c.name).join(" · ");
-  const totalCount = filteredRecommended.length + filteredUserSpots.length;
+  const totalCount = filteredRecommended.length + filteredUserAttractions.length;
 
   return (
     <div className="min-h-screen">
@@ -315,7 +414,7 @@ export default function FoodPage() {
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="맛집 검색..."
+                placeholder="명소 검색..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-9"
@@ -328,19 +427,20 @@ export default function FoodPage() {
             >
               <Search className="h-3.5 w-3.5" />
               <Plus className="h-3.5 w-3.5" />
-              <span className="text-xs">맛집 검색 추가</span>
+              <span className="text-xs">명소 검색 추가</span>
             </Button>
           </div>
 
           <p className="text-xs text-muted-foreground mb-2">
-            {cityLabel ? `${cityLabel} 맛집 ${totalCount}개` : `맛집 ${totalCount}개`}
+            {cityLabel
+              ? `${cityLabel} 명소 ${totalCount}개`
+              : `명소 ${totalCount}개`}
           </p>
 
           {selectedCities.length > 1 && (
             <Tabs
               value={selectedCity}
               onValueChange={(v) => setSelectedCity(v)}
-              className="mb-2"
             >
               <TabsList className="flex h-auto gap-1 bg-transparent p-0 overflow-x-auto w-full justify-start">
                 <TabsTrigger
@@ -361,32 +461,15 @@ export default function FoodPage() {
               </TabsList>
             </Tabs>
           )}
-
-          <Tabs
-            value={selectedCategory}
-            onValueChange={(v) => setSelectedCategory(v as FilterCategory)}
-          >
-            <TabsList className="flex h-auto gap-1 bg-transparent p-0 overflow-x-auto w-full justify-start">
-              {CATEGORY_FILTERS.map(({ key, label }) => (
-                <TabsTrigger
-                  key={key}
-                  value={key}
-                  className="shrink-0 rounded-full border data-[state=active]:bg-primary data-[state=active]:text-primary-foreground text-xs px-3 py-1.5"
-                >
-                  {label}
-                </TabsTrigger>
-              ))}
-            </TabsList>
-          </Tabs>
         </div>
       </div>
 
       <div className="px-4 py-4 space-y-6">
-        {/* 추천 맛집 section */}
+        {/* 추천 명소 section */}
         <section>
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
-              <h2 className="text-sm font-semibold">추천 맛집</h2>
+              <h2 className="text-sm font-semibold">추천 명소</h2>
               <div className="flex gap-1">
                 {selectedCities.map((city) => (
                   <Badge key={city.id} variant="secondary" className="text-xs">
@@ -412,23 +495,28 @@ export default function FoodPage() {
           </div>
 
           {recLoading ? (
-            <RecommendationSkeleton />
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {[1, 2, 3, 4].map((n) => (
+                <AttractionSkeleton key={n} />
+              ))}
+            </div>
           ) : filteredRecommended.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-10 text-center border rounded-lg bg-muted/20">
-              <p className="text-3xl mb-2">🍽</p>
+              <p className="text-3xl mb-2">🏯</p>
               <p className="text-muted-foreground text-sm">
-                {searchQuery || selectedCategory !== "all"
-                  ? "필터에 맞는 추천 맛집이 없습니다"
-                  : "추천 맛집을 불러오는 중..."}
+                {searchQuery
+                  ? "검색 결과가 없습니다"
+                  : "추천 명소를 불러오는 중..."}
               </p>
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              {filteredRecommended.map((spot) => (
-                <FoodCard
-                  key={spot.id}
-                  spot={spot}
-                  onClick={() => handleCardClick(spot)}
+              {filteredRecommended.map((attraction) => (
+                <AttractionCard
+                  key={attraction.placeId}
+                  attraction={attraction}
+                  onSchedule={handleSchedule}
+                  scheduled={scheduledSet.has(attraction.placeId)}
                 />
               ))}
             </div>
@@ -437,28 +525,28 @@ export default function FoodPage() {
 
         <Separator />
 
-        {/* 내가 추가한 맛집 section */}
+        {/* 내가 추가한 명소 section */}
         <section>
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-sm font-semibold">
-              내가 추가한 맛집
-              {userSpots.length > 0 && (
+              내가 추가한 명소
+              {userAttractions.length > 0 && (
                 <span className="ml-1.5 text-xs font-normal text-muted-foreground">
-                  {filteredUserSpots.length}개
+                  {filteredUserAttractions.length}개
                 </span>
               )}
             </h2>
           </div>
 
-          {filteredUserSpots.length === 0 ? (
+          {filteredUserAttractions.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-10 text-center border rounded-lg bg-muted/20">
-              <p className="text-3xl mb-2">🔖</p>
+              <p className="text-3xl mb-2">🗺</p>
               <p className="text-muted-foreground text-sm">
-                {userSpots.length === 0
-                  ? "아직 추가한 맛집이 없어요"
-                  : "필터에 맞는 맛집이 없습니다"}
+                {userAttractions.length === 0
+                  ? "아직 추가한 명소가 없어요"
+                  : "필터에 맞는 명소가 없습니다"}
               </p>
-              {userSpots.length === 0 && (
+              {userAttractions.length === 0 && (
                 <Button
                   variant="outline"
                   size="sm"
@@ -466,17 +554,18 @@ export default function FoodPage() {
                   onClick={() => setAddDrawerOpen(true)}
                 >
                   <Plus className="h-3.5 w-3.5" />
-                  맛집 추가하기
+                  명소 추가하기
                 </Button>
               )}
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              {filteredUserSpots.map((spot) => (
-                <FoodCard
-                  key={spot.id}
-                  spot={spot}
-                  onClick={() => handleCardClick(spot)}
+              {filteredUserAttractions.map((attraction) => (
+                <AttractionCard
+                  key={attraction.placeId}
+                  attraction={attraction}
+                  onSchedule={handleSchedule}
+                  scheduled={scheduledSet.has(attraction.placeId)}
                 />
               ))}
             </div>
@@ -484,32 +573,18 @@ export default function FoodPage() {
         </section>
       </div>
 
-      {/* Food detail drawer */}
-      <Drawer open={drawerOpen} onOpenChange={setDrawerOpen}>
-        <DrawerContent>
-          <DrawerHeader className="sr-only">
-            <DrawerTitle>{selectedSpot?.name ?? "맛집 상세"}</DrawerTitle>
-          </DrawerHeader>
-          <div className="px-4 pb-8 overflow-y-auto max-h-[80vh]">
-            {selectedSpot && (
-              <FoodDetail spot={selectedSpot} onClose={handleClose} />
-            )}
-          </div>
-        </DrawerContent>
-      </Drawer>
-
-      {/* Add food search drawer */}
+      {/* Add attraction search drawer */}
       <Drawer open={addDrawerOpen} onOpenChange={setAddDrawerOpen}>
         <DrawerContent>
           <DrawerHeader>
-            <DrawerTitle>맛집 검색 추가</DrawerTitle>
+            <DrawerTitle>명소 검색 추가</DrawerTitle>
           </DrawerHeader>
           <div className="px-4 pb-8 overflow-y-auto max-h-[80vh]">
             <div className="flex gap-2 mb-4">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="식당 이름 또는 키워드..."
+                  placeholder="명소 이름 또는 키워드..."
                   value={addSearchQuery}
                   onChange={(e) => setAddSearchQuery(e.target.value)}
                   onKeyDown={(e) => {
@@ -571,9 +646,9 @@ export default function FoodPage() {
 
             {!isSearching && !hasSearched && (
               <div className="flex flex-col items-center justify-center py-12 text-center">
-                <p className="text-3xl mb-2">🍜</p>
+                <p className="text-3xl mb-2">🏯</p>
                 <p className="text-sm text-muted-foreground">
-                  식당 이름이나 음식 종류로 검색해보세요
+                  명소 이름이나 키워드로 검색해보세요
                 </p>
               </div>
             )}

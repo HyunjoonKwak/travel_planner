@@ -12,6 +12,7 @@ import {
   CheckSquare,
   Settings,
   Plane,
+  Landmark,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTripConfig } from "@/hooks/use-trip-config";
@@ -20,6 +21,7 @@ const SIDEBAR_ITEMS = [
   { href: "/dashboard", label: "홈", icon: Home },
   { href: "/schedule", label: "일정", icon: CalendarDays },
   { href: "/food", label: "맛집", icon: UtensilsCrossed },
+  { href: "/attractions", label: "명소", icon: Landmark },
   { href: "/journal", label: "일기", icon: BookOpen },
   { href: "/learn", label: "학습", icon: GraduationCap },
   { href: "/expense", label: "가계부", icon: Wallet },

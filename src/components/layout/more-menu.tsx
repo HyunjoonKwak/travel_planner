@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { Wallet, CheckSquare, Settings } from "lucide-react";
+import { Wallet, CheckSquare, Settings, Landmark } from "lucide-react";
 
 const MORE_ITEMS = [
+  { href: "/attractions", label: "명소", icon: Landmark, description: "관광 명소 추천" },
   { href: "/expense", label: "가계부", icon: Wallet, description: "여행 지출 관리" },
   { href: "/checklist", label: "준비물", icon: CheckSquare, description: "여행 준비 체크리스트" },
   { href: "/settings", label: "설정", icon: Settings, description: "앱 설정" },
