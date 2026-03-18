@@ -21,8 +21,9 @@ function buildCacheKey(type: string, cities: ReadonlyArray<string>): string {
 }
 
 function readCache(key: string): RecommendationResult[] | null {
+  if (typeof window === "undefined") return null;
   try {
-    const raw = localStorage.getItem(key);
+    const raw = window.localStorage.getItem(key);
     if (!raw) return null;
     const entry: CacheEntry = JSON.parse(raw);
     if (Date.now() - entry.timestamp < CACHE_TTL_MS) {
@@ -35,9 +36,10 @@ function readCache(key: string): RecommendationResult[] | null {
 }
 
 function writeCache(key: string, data: RecommendationResult[]): void {
+  if (typeof window === "undefined") return;
   try {
     const entry: CacheEntry = { data, timestamp: Date.now() };
-    localStorage.setItem(key, JSON.stringify(entry));
+    window.localStorage.setItem(key, JSON.stringify(entry));
   } catch {
     // Storage quota exceeded or unavailable — fail silently
   }
@@ -92,10 +94,12 @@ export function useRecommendations({
   }, [fetchRecommendations]);
 
   const refresh = useCallback(() => {
-    try {
-      localStorage.removeItem(cacheKey);
-    } catch {
-      // ignore
+    if (typeof window !== "undefined") {
+      try {
+        window.localStorage.removeItem(cacheKey);
+      } catch {
+        // ignore
+      }
     }
     fetchRecommendations();
   }, [cacheKey, fetchRecommendations]);
