@@ -19,6 +19,7 @@ import { useActiveTrip } from "@/hooks/use-trip";
 import { useRecommendations } from "@/hooks/use-recommendations";
 import type { RecommendationResult } from "@/types/recommendation";
 import type { GooglePlaceResult } from "@/types/food-search";
+import { NoTripPrompt } from "@/components/common/no-trip-prompt";
 
 function normalizeKo(str: string): string {
   return str.toLowerCase().replace(/\s+/g, "");
@@ -93,14 +94,7 @@ export default function AttractionsPage() {
   }
 
   if (!activeTrip) {
-    return (
-      <div className="flex flex-col items-center justify-center py-16 text-center px-4 min-h-screen">
-        <p className="text-3xl mb-3">🏯</p>
-        <p className="text-sm font-medium">여행이 설정되지 않았습니다</p>
-        <p className="text-xs text-muted-foreground mt-1 mb-4">설정에서 여행을 먼저 만들어주세요</p>
-        <a href="/settings"><button className="text-sm border rounded-lg px-4 py-2 hover:bg-muted transition-colors">설정으로 이동</button></a>
-      </div>
-    );
+    return <NoTripPrompt icon="🏯" />;
   }
 
   const {

@@ -2,6 +2,7 @@ export interface RecommendationResult {
   placeId: string;
   name: string;
   nameJa: string;
+  nameLocal?: string;
   address: string;
   rating: number;
   reviewCount: number;

@@ -10,6 +10,7 @@ import { useActiveTrip } from "@/hooks/use-trip";
 import { useTripJournal } from "@/hooks/use-trip-data";
 import { JournalEntry as JournalEntryType } from "@/types/journal";
 import { cn } from "@/lib/utils";
+import { NoTripPrompt } from "@/components/common/no-trip-prompt";
 
 // Adapter: DB JournalEntry -> local JournalEntry type
 function adaptDbEntry(dbEntry: {
@@ -58,20 +59,6 @@ function EmptyState() {
   );
 }
 
-function NoTripState() {
-  return (
-    <div className="flex flex-col items-center justify-center py-20 gap-4 text-muted-foreground">
-      <span className="text-4xl">🗺️</span>
-      <p className="text-sm">활성화된 여행이 없어요.</p>
-      <Link
-        href="/settings"
-        className={cn(buttonVariants({ size: "sm", variant: "outline" }))}
-      >
-        여행 설정하기
-      </Link>
-    </div>
-  );
-}
 
 interface PhotoEntry {
   readonly photoRef: string;
@@ -168,7 +155,7 @@ export default function JournalPage() {
         <div className="px-4 pt-6 pb-4">
           <h1 className="text-2xl font-bold">여행 일기</h1>
         </div>
-        <NoTripState />
+        <NoTripPrompt icon="📖" message="활성화된 여행이 없어요" />
       </div>
     );
   }

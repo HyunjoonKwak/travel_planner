@@ -187,7 +187,10 @@ function getSeasonHighlights(
   return null;
 }
 
-export function SakuraStatusCard() {
+/** @deprecated Use SeasonTipsCard */
+export const SakuraStatusCard = SeasonTipsCard;
+
+export function SeasonTipsCard() {
   const { config } = useTripConfig();
 
   if (!config.country) return null;

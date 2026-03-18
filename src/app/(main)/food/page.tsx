@@ -26,6 +26,7 @@ import type { FoodCategory, FoodSpot } from "@/types/food";
 import { FOOD_CATEGORY_CONFIG } from "@/types/food";
 import type { GooglePlaceResult } from "@/types/food-search";
 import type { RecommendationResult } from "@/types/recommendation";
+import { NoTripPrompt } from "@/components/common/no-trip-prompt";
 
 type FilterCategory = "all" | FoodCategory;
 
@@ -42,20 +43,25 @@ function normalizeKo(str: string): string {
 }
 
 const TYPE_TO_CATEGORY: Record<string, FoodCategory> = {
-  ramen: "ramen",
-  noodle_restaurant: "ramen",
-  sushi_restaurant: "sushi",
-  seafood_restaurant: "sushi",
-  japanese_restaurant: "other",
-  korean_restaurant: "other",
-  chinese_restaurant: "other",
-  italian_restaurant: "other",
-  steak_house: "yakiniku",
-  barbecue_restaurant: "yakiniku",
+  // Noodles
+  ramen: "noodles",
+  noodle_restaurant: "noodles",
+  // Seafood
+  sushi_restaurant: "seafood",
+  seafood_restaurant: "seafood",
+  // BBQ
+  steak_house: "bbq",
+  barbecue_restaurant: "bbq",
+  // Cafe
   cafe: "cafe",
   coffee_shop: "cafe",
   bakery: "cafe",
+  dessert_shop: "cafe",
+  // Generic
   meal_takeaway: "other",
+  meal_delivery: "other",
+  restaurant: "other",
+  food: "other",
 };
 
 function guessCategory(types: ReadonlyArray<string>, name: string): FoodCategory {
@@ -64,14 +70,50 @@ function guessCategory(types: ReadonlyArray<string>, name: string): FoodCategory
     if (mapped) return mapped;
   }
   const n = name.toLowerCase();
-  if (n.includes("라멘") || n.includes("ラーメン") || n.includes("麺")) return "ramen";
-  if (n.includes("타코야키") || n.includes("たこ焼")) return "takoyaki";
-  if (n.includes("오코노미") || n.includes("お好み")) return "okonomiyaki";
-  if (n.includes("쿠시") || n.includes("串カツ")) return "kushikatsu";
-  if (n.includes("스시") || n.includes("寿司") || n.includes("鮨")) return "sushi";
-  if (n.includes("우동") || n.includes("うどん") || n.includes("そば")) return "udon";
-  if (n.includes("야키니쿠") || n.includes("焼肉") || n.includes("焼き肉")) return "yakiniku";
-  if (n.includes("카페") || n.includes("커피") || n.includes("コーヒー") || n.includes("カフェ")) return "cafe";
+  // Noodles - JP/TW/TH/VN
+  if (
+    n.includes("라멘") || n.includes("ラーメン") || n.includes("麺") ||
+    n.includes("pho") || n.includes("phở") || n.includes("bún") ||
+    n.includes("pad thai") || n.includes("ก๋วยเตี๋ยว") ||
+    n.includes("우동") || n.includes("うどん") || n.includes("そば") ||
+    n.includes("牛肉麵") || n.includes("beef noodle")
+  ) return "noodles";
+  // Seafood
+  if (
+    n.includes("스시") || n.includes("寿司") || n.includes("鮨") ||
+    n.includes("해산물") || n.includes("seafood") || n.includes("ปลา")
+  ) return "seafood";
+  // BBQ
+  if (
+    n.includes("야키니쿠") || n.includes("焼肉") || n.includes("焼き肉") ||
+    n.includes("bbq") || n.includes("mookata") || n.includes("หมูกระทะ")
+  ) return "bbq";
+  // Street food
+  if (
+    n.includes("타코야키") || n.includes("たこ焼") ||
+    n.includes("오코노미") || n.includes("お好み") ||
+    n.includes("쿠시") || n.includes("串カツ") ||
+    n.includes("banh mi") || n.includes("bánh mì") ||
+    n.includes("satay") || n.includes("사테") ||
+    n.includes("stinky tofu") || n.includes("臭豆腐")
+  ) return "street_food";
+  // Soup
+  if (
+    n.includes("tom yum") || n.includes("ต้มยำ") ||
+    n.includes("soup") || n.includes("phở") ||
+    n.includes("ramen")
+  ) return "soup";
+  // Cafe
+  if (
+    n.includes("카페") || n.includes("커피") || n.includes("コーヒー") ||
+    n.includes("カフェ") || n.includes("coffee") || n.includes("cafe") ||
+    n.includes("กาแฟ") || n.includes("cà phê")
+  ) return "cafe";
+  // Rice
+  if (
+    n.includes("볶음밥") || n.includes("curry") || n.includes("카레") ||
+    n.includes("fried rice") || n.includes("ข้าว") || n.includes("cơm")
+  ) return "rice";
   return "other";
 }
 
@@ -218,14 +260,7 @@ export default function FoodPage() {
   }
 
   if (!activeTrip) {
-    return (
-      <div className="flex flex-col items-center justify-center py-16 text-center px-4 min-h-screen">
-        <p className="text-3xl mb-3">🍜</p>
-        <p className="text-sm font-medium">여행이 설정되지 않았습니다</p>
-        <p className="text-xs text-muted-foreground mt-1 mb-4">설정에서 여행을 먼저 만들어주세요</p>
-        <a href="/settings"><Button size="sm" variant="outline">설정으로 이동</Button></a>
-      </div>
-    );
+    return <NoTripPrompt icon="🍜" />;
   }
 
   // 1) 에디터 추천 (정적 데이터 - 미즈노, 잇치란 등)

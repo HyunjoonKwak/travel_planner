@@ -22,7 +22,7 @@ import { useTripSchedules } from "@/hooks/use-trip-data";
 import { AIScheduleDrawer } from "@/components/schedule/ai-schedule-drawer";
 import type { ScheduleItem } from "@/types/schedule";
 import type { FlightInfo, HotelInfo } from "@/hooks/use-trip-config";
-import Link from "next/link";
+import { NoTripPrompt } from "@/components/common/no-trip-prompt";
 
 function generateTripDates(start: string, end: string): string[] {
   if (!start || !end) return [];
@@ -59,23 +59,6 @@ function parseTripJson<T>(raw: string | null | undefined): T | undefined {
   } catch {
     return undefined;
   }
-}
-
-function NoTripPrompt() {
-  return (
-    <div className="flex flex-col items-center justify-center py-16 text-center px-4">
-      <p className="text-3xl mb-3">✈️</p>
-      <p className="text-sm font-medium">여행이 설정되지 않았습니다</p>
-      <p className="text-xs text-muted-foreground mt-1 mb-4">
-        설정에서 여행을 먼저 만들어주세요
-      </p>
-      <Link href="/settings">
-        <Button size="sm" variant="outline">
-          설정으로 이동
-        </Button>
-      </Link>
-    </div>
-  );
 }
 
 export default function SchedulePage() {

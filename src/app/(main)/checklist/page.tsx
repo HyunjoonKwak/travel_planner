@@ -9,16 +9,21 @@ import { ChecklistGroup } from "@/components/checklist/checklist-group";
 import { useLocalStorage } from "@/hooks/use-local-storage";
 import {
   ChecklistGroup as ChecklistGroupType,
-  DEFAULT_CHECKLIST,
+  getDefaultChecklist,
 } from "@/lib/data/checklist";
 import { generateId } from "@/lib/utils/date";
+import { useActiveTrip } from "@/hooks/use-trip";
 
 const STORAGE_KEY = "checklist_groups";
 
 export default function ChecklistPage() {
+  const { activeTrip } = useActiveTrip();
+  const tripCountry = activeTrip?.country ?? undefined;
+  const defaultChecklist = getDefaultChecklist(tripCountry);
+
   const [groups, setGroups] = useLocalStorage<ChecklistGroupType[]>(
     STORAGE_KEY,
-    DEFAULT_CHECKLIST as ChecklistGroupType[],
+    defaultChecklist as ChecklistGroupType[],
   );
   const [newItemText, setNewItemText] = useState("");
 

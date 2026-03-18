@@ -2,7 +2,7 @@ export interface Expense {
   readonly id: string;
   readonly date: string;
   readonly amount: number;
-  readonly currency: "JPY" | "KRW";
+  readonly currency: string;
   readonly category: ExpenseCategory;
   readonly description: string;
   readonly memo?: string;

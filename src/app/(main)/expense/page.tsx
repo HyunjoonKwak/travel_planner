@@ -5,7 +5,7 @@ import { Plus, PiggyBank } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Drawer,
@@ -14,7 +14,12 @@ import {
   DrawerTitle,
 } from "@/components/ui/drawer";
 import { cn } from "@/lib/utils";
-import { formatJPY, formatKRW, jpyToKrw, krwToJpy } from "@/lib/utils/currency";
+import {
+  formatCurrency,
+  convertToKRW,
+  getCurrencyForCountry,
+  getCurrencyInfo,
+} from "@/lib/utils/currency";
 import { formatDateKo } from "@/lib/utils/date";
 import { useActiveTrip } from "@/hooks/use-trip";
 import { useTripExpenses } from "@/hooks/use-trip-data";
@@ -25,13 +30,27 @@ import type { Expense, ExpenseCategory } from "@/types/expense";
 import { EXPENSE_CATEGORY_CONFIG } from "@/types/expense";
 import type { BudgetConfig } from "@/hooks/use-trip-config";
 import Link from "next/link";
+import { NoTripPrompt } from "@/components/common/no-trip-prompt";
+
+const DEFAULT_RATE = 8.9;
+
+function parseCountryCode(country: string | null | undefined): string {
+  if (!country) return "JP";
+  return country.trim().toUpperCase().slice(0, 2);
+}
+
+function toKRW(expense: Expense): number {
+  if (expense.currency === "KRW") return expense.amount;
+  return convertToKRW(expense.amount, expense.currency, DEFAULT_RATE);
+}
 
 interface BudgetBarProps {
   spent: number;
   budget: number;
+  localCode: string;
 }
 
-function BudgetBar({ spent, budget }: BudgetBarProps) {
+function BudgetBar({ spent, budget, localCode }: BudgetBarProps) {
   const percent = Math.min((spent / budget) * 100, 100);
   const remaining = budget - spent;
   const isOver = spent > budget;
@@ -40,7 +59,9 @@ function BudgetBar({ spent, budget }: BudgetBarProps) {
     <div className="bg-card border rounded-xl p-4 mx-4 my-3">
       <div className="flex items-center justify-between mb-2">
         <span className="text-sm font-medium">총 예산</span>
-        <span className="text-sm font-bold">{formatJPY(budget)}</span>
+        <span className="text-sm font-bold">
+          {formatCurrency(budget, localCode)}
+        </span>
       </div>
       <Progress
         value={percent}
@@ -49,10 +70,7 @@ function BudgetBar({ spent, budget }: BudgetBarProps) {
       <div className="flex items-center justify-between text-xs">
         <div>
           <span className="text-muted-foreground">사용: </span>
-          <span className="font-semibold">{formatJPY(spent)}</span>
-          <span className="text-muted-foreground ml-1">
-            ({formatKRW(jpyToKrw(spent))})
-          </span>
+          <span className="font-semibold">{formatCurrency(spent, localCode)}</span>
         </div>
         <div>
           <span className="text-muted-foreground">
@@ -64,7 +82,7 @@ function BudgetBar({ spent, budget }: BudgetBarProps) {
               isOver ? "text-destructive" : "text-green-600",
             )}
           >
-            {formatJPY(Math.abs(remaining))}
+            {formatCurrency(Math.abs(remaining), localCode)}
           </span>
         </div>
       </div>
@@ -95,41 +113,21 @@ function NoBudgetPrompt() {
   );
 }
 
-function NoTripPrompt() {
-  return (
-    <div className="flex flex-col items-center justify-center py-16 text-center px-4">
-      <PiggyBank className="h-12 w-12 text-muted-foreground/50 mb-3" />
-      <p className="text-sm font-medium">여행이 설정되지 않았습니다</p>
-      <p className="text-xs text-muted-foreground mt-1 mb-4">
-        설정에서 여행을 먼저 만들어주세요
-      </p>
-      <Link href="/settings">
-        <Button size="sm" variant="outline">
-          설정으로 이동
-        </Button>
-      </Link>
-    </div>
-  );
-}
-
 interface DailySummaryItemProps {
   date: string;
   expenses: Expense[];
+  localCode: string;
 }
 
-function DailySummaryItem({ date, expenses }: DailySummaryItemProps) {
-  const total = expenses.reduce(
-    (sum, e) => sum + (e.currency === "JPY" ? e.amount : krwToJpy(e.amount)),
-    0,
-  );
+function DailySummaryItem({ date, expenses, localCode }: DailySummaryItemProps) {
+  const totalKRW = expenses.reduce((sum, e) => sum + toKRW(e), 0);
 
   return (
     <div className="flex items-center justify-between py-3 border-b last:border-0">
       <span className="text-sm">{formatDateKo(date)}</span>
       <div className="text-right">
-        <p className="text-sm font-semibold">{formatJPY(total)}</p>
-        <p className="text-xs text-muted-foreground">
-          {formatKRW(jpyToKrw(total))}
+        <p className="text-sm font-semibold">
+          {formatCurrency(totalKRW, "KRW")}
         </p>
       </div>
     </div>
@@ -139,28 +137,27 @@ function DailySummaryItem({ date, expenses }: DailySummaryItemProps) {
 interface CategorySummaryItemProps {
   category: ExpenseCategory;
   expenses: Expense[];
-  totalSpent: number;
+  totalSpentKRW: number;
   budgetAmount?: number;
+  localCode: string;
 }
 
 function CategorySummaryItem({
   category,
   expenses,
-  totalSpent,
+  totalSpentKRW,
   budgetAmount,
+  localCode,
 }: CategorySummaryItemProps) {
   const config = EXPENSE_CATEGORY_CONFIG[category];
-  const categoryTotal = expenses.reduce(
-    (sum, e) => sum + (e.currency === "JPY" ? e.amount : krwToJpy(e.amount)),
-    0,
-  );
+  const categoryTotalKRW = expenses.reduce((sum, e) => sum + toKRW(e), 0);
   const percent =
     budgetAmount && budgetAmount > 0
-      ? Math.min((categoryTotal / budgetAmount) * 100, 100)
-      : totalSpent > 0
-        ? (categoryTotal / totalSpent) * 100
+      ? Math.min((categoryTotalKRW / budgetAmount) * 100, 100)
+      : totalSpentKRW > 0
+        ? (categoryTotalKRW / totalSpentKRW) * 100
         : 0;
-  const isOver = budgetAmount ? categoryTotal > budgetAmount : false;
+  const isOver = budgetAmount ? categoryTotalKRW > budgetAmount : false;
 
   return (
     <div className="flex items-center gap-3 py-3 border-b last:border-0">
@@ -172,11 +169,11 @@ function CategorySummaryItem({
           <span className="text-sm font-medium">{config.label}</span>
           <div className="text-right">
             <span className="text-sm font-semibold">
-              {formatJPY(categoryTotal)}
+              {formatCurrency(categoryTotalKRW, localCode)}
             </span>
             {budgetAmount !== undefined && budgetAmount > 0 && (
               <span className="text-xs text-muted-foreground ml-1">
-                / {formatJPY(budgetAmount)}
+                / {formatCurrency(budgetAmount, localCode)}
               </span>
             )}
           </div>
@@ -188,7 +185,7 @@ function CategorySummaryItem({
         <p className="text-xs text-muted-foreground mt-0.5">
           {budgetAmount && budgetAmount > 0
             ? isOver
-              ? `¥${(categoryTotal - budgetAmount).toLocaleString()} 초과`
+              ? `${formatCurrency(categoryTotalKRW - budgetAmount, localCode)} 초과`
               : `${percent.toFixed(1)}% 사용`
             : `${percent.toFixed(1)}%`}
         </p>
@@ -218,19 +215,17 @@ export default function ExpensePage() {
 
   const [drawerOpen, setDrawerOpen] = useState(false);
 
-  // Cast DB items to local Expense type (fields compatible)
   const expenses = dbItems as unknown as Expense[];
+
+  const countryCode = parseCountryCode(activeTrip?.country);
+  const localCurrencyInfo = getCurrencyForCountry(countryCode);
+  const localCode = localCurrencyInfo.code;
 
   const budget = parseTripJson<BudgetConfig>(activeTrip?.budget);
   const totalBudget = budget?.totalBudget ?? 0;
 
-  const totalSpent = useMemo(
-    () =>
-      expenses.reduce(
-        (sum, e) =>
-          sum + (e.currency === "JPY" ? e.amount : krwToJpy(e.amount)),
-        0,
-      ),
+  const totalSpentKRW = useMemo(
+    () => expenses.reduce((sum, e) => sum + toKRW(e), 0),
     [expenses],
   );
 
@@ -250,8 +245,8 @@ export default function ExpensePage() {
       map.set(e.category, [...existing, e]);
     });
     return Array.from(map.entries()).sort(([, a], [, b]) => {
-      const totalA = a.reduce((s, x) => s + x.amount, 0);
-      const totalB = b.reduce((s, x) => s + x.amount, 0);
+      const totalA = a.reduce((s, x) => s + toKRW(x), 0);
+      const totalB = b.reduce((s, x) => s + toKRW(x), 0);
       return totalB - totalA;
     });
   }, [expenses]);
@@ -282,7 +277,7 @@ export default function ExpensePage() {
   return (
     <div className="relative min-h-screen pb-20">
       {totalBudget > 0 ? (
-        <BudgetBar spent={totalSpent} budget={totalBudget} />
+        <BudgetBar spent={totalSpentKRW} budget={totalBudget} localCode={localCode} />
       ) : (
         <NoBudgetPrompt />
       )}
@@ -308,6 +303,7 @@ export default function ExpensePage() {
           ) : (
             <ExpenseList
               expenses={expenses}
+              localCurrencyCode={localCode}
               onDelete={handleDeleteExpense}
             />
           )}
@@ -330,6 +326,7 @@ export default function ExpensePage() {
                     key={date}
                     date={date}
                     expenses={dayExpenses}
+                    localCode={localCode}
                   />
                 ))}
               </div>
@@ -354,8 +351,9 @@ export default function ExpensePage() {
                     key={category}
                     category={category}
                     expenses={catExpenses}
-                    totalSpent={totalSpent}
+                    totalSpentKRW={totalSpentKRW}
                     budgetAmount={budget?.categories[category]}
+                    localCode={localCode}
                   />
                 ))}
               </div>

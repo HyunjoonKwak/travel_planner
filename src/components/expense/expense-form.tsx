@@ -17,12 +17,19 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import { formatKRW, formatJPY, jpyToKrw, krwToJpy } from "@/lib/utils/currency";
+import {
+  formatCurrency,
+  convertToKRW,
+  convertFromKRW,
+  getCurrencyForCountry,
+  getCurrencyInfo,
+} from "@/lib/utils/currency";
 import { generateId } from "@/lib/utils/date";
+import { useActiveTrip } from "@/hooks/use-trip";
 import type { Expense, ExpenseCategory } from "@/types/expense";
 import { EXPENSE_CATEGORY_CONFIG } from "@/types/expense";
 
-type Currency = "JPY" | "KRW";
+const DEFAULT_RATE = 8.9;
 
 const expenseSchema = z.object({
   amount: z
@@ -30,7 +37,12 @@ const expenseSchema = z.object({
     .positive("0보다 큰 금액을 입력하세요")
     .max(100_000_000, "금액이 너무 큽니다"),
   category: z.enum([
-    "food", "transport", "shopping", "accommodation", "sightseeing", "other",
+    "food",
+    "transport",
+    "shopping",
+    "accommodation",
+    "sightseeing",
+    "other",
   ] as const),
   description: z.string().min(1, "내용을 입력하세요").max(100),
   date: z.string().min(1, "날짜를 선택하세요"),
@@ -56,8 +68,19 @@ const CATEGORY_OPTIONS = Object.entries(EXPENSE_CATEGORY_CONFIG) as [
 
 const TODAY = new Date().toISOString().slice(0, 10);
 
+function parseCountryCode(country: string | null | undefined): string {
+  if (!country) return "JP";
+  // country may be stored as country code like "JP", "TH", etc.
+  return country.trim().toUpperCase().slice(0, 2);
+}
+
 export function ExpenseForm({ onSubmit, onCancel }: ExpenseFormProps) {
-  const [currency, setCurrency] = useState<Currency>("JPY");
+  const { activeTrip } = useActiveTrip();
+  const countryCode = parseCountryCode(activeTrip?.country);
+  const localCurrency = getCurrencyForCountry(countryCode);
+  const krwCurrency = getCurrencyInfo("KRW");
+
+  const [currencyCode, setCurrencyCode] = useState<string>(localCurrency.code);
 
   const {
     register,
@@ -79,25 +102,30 @@ export function ExpenseForm({ onSubmit, onCancel }: ExpenseFormProps) {
   const amountValue = watch("amount");
   const categoryValue = watch("category");
 
+  const isLocalCurrency = currencyCode !== "KRW";
+
   const convertedAmount =
     amountValue > 0
-      ? currency === "JPY"
-        ? jpyToKrw(amountValue)
-        : krwToJpy(amountValue)
+      ? isLocalCurrency
+        ? convertToKRW(amountValue, currencyCode, DEFAULT_RATE)
+        : convertFromKRW(amountValue, localCurrency.code, DEFAULT_RATE)
       : 0;
 
   const convertedLabel =
-    currency === "JPY"
-      ? `약 ${formatKRW(convertedAmount)}`
-      : `약 ${formatJPY(convertedAmount)}`;
+    amountValue > 0
+      ? isLocalCurrency
+        ? `약 ${formatCurrency(convertedAmount, "KRW")}`
+        : `약 ${formatCurrency(convertedAmount, localCurrency.code)}`
+      : "";
 
   function toggleCurrency() {
     if (amountValue > 0) {
-      const converted =
-        currency === "JPY" ? jpyToKrw(amountValue) : krwToJpy(amountValue);
+      const converted = isLocalCurrency
+        ? convertToKRW(amountValue, currencyCode, DEFAULT_RATE)
+        : convertFromKRW(amountValue, localCurrency.code, DEFAULT_RATE);
       setValue("amount", converted, { shouldValidate: true });
     }
-    setCurrency((prev) => (prev === "JPY" ? "KRW" : "JPY"));
+    setCurrencyCode((prev) => (prev === "KRW" ? localCurrency.code : "KRW"));
   }
 
   function handleFormSubmit(values: ExpenseFormValues) {
@@ -106,7 +134,7 @@ export function ExpenseForm({ onSubmit, onCancel }: ExpenseFormProps) {
       id: generateId(),
       date: values.date,
       amount: values.amount,
-      currency,
+      currency: currencyCode,
       category: values.category,
       description: values.description,
       memo: values.memo || undefined,
@@ -115,8 +143,10 @@ export function ExpenseForm({ onSubmit, onCancel }: ExpenseFormProps) {
     onSubmit(expense);
   }
 
-  const currencySymbol = currency === "JPY" ? "¥" : "₩";
-  const currencyLabel = currency === "JPY" ? "엔화 (JPY)" : "원화 (KRW)";
+  const activeCurrencyInfo = getCurrencyInfo(currencyCode);
+  const currencyLabel = isLocalCurrency
+    ? `${localCurrency.name} (${localCurrency.code})`
+    : `원화 (KRW)`;
 
   return (
     <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-4">
@@ -124,21 +154,23 @@ export function ExpenseForm({ onSubmit, onCancel }: ExpenseFormProps) {
       <div>
         <div className="flex items-center justify-between mb-1.5">
           <Label htmlFor="amount">금액 *</Label>
-          <button
-            type="button"
-            onClick={toggleCurrency}
-            className="flex items-center gap-1.5 text-xs font-medium text-primary hover:text-primary/80 transition-colors rounded-full border border-primary/30 px-2.5 py-1"
-          >
-            <ArrowRightLeft className="h-3 w-3" />
-            {currencyLabel}
-          </button>
+          {localCurrency.code !== "KRW" && (
+            <button
+              type="button"
+              onClick={toggleCurrency}
+              className="flex items-center gap-1.5 text-xs font-medium text-primary hover:text-primary/80 transition-colors rounded-full border border-primary/30 px-2.5 py-1"
+            >
+              <ArrowRightLeft className="h-3 w-3" />
+              {currencyLabel}
+            </button>
+          )}
         </div>
 
         <div className="flex gap-2 items-start">
           <div className="flex-1">
             <div className="relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-medium">
-                {currencySymbol}
+                {activeCurrencyInfo.symbol}
               </span>
               <Input
                 id="amount"
@@ -153,12 +185,9 @@ export function ExpenseForm({ onSubmit, onCancel }: ExpenseFormProps) {
           </div>
         </div>
 
-        {convertedAmount > 0 && (
+        {convertedAmount > 0 && convertedLabel && (
           <div className="mt-1.5 flex items-center gap-2 text-xs">
             <span className="text-muted-foreground">{convertedLabel}</span>
-            <span className="text-muted-foreground/50">
-              (1¥ ≈ ₩8.9)
-            </span>
           </div>
         )}
       </div>
@@ -169,7 +198,9 @@ export function ExpenseForm({ onSubmit, onCancel }: ExpenseFormProps) {
         <Select
           value={categoryValue}
           onValueChange={(val) =>
-            setValue("category", val as ExpenseCategory, { shouldValidate: true })
+            setValue("category", val as ExpenseCategory, {
+              shouldValidate: true,
+            })
           }
         >
           <SelectTrigger className={cn(errors.category && "border-destructive")}>
@@ -224,7 +255,12 @@ export function ExpenseForm({ onSubmit, onCancel }: ExpenseFormProps) {
 
       {/* Actions */}
       <div className="flex gap-2 pt-2">
-        <Button type="button" variant="outline" className="flex-1" onClick={onCancel}>
+        <Button
+          type="button"
+          variant="outline"
+          className="flex-1"
+          onClick={onCancel}
+        >
           취소
         </Button>
         <Button type="submit" className="flex-1" disabled={isSubmitting}>

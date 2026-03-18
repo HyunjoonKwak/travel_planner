@@ -1,6 +1,6 @@
-import type { FoodSpot } from "@/types/food";
+import type { LegacyFoodSpot } from "@/types/food";
 
-export const KYOTO_FOOD_SPOTS: ReadonlyArray<FoodSpot> = [
+export const KYOTO_FOOD_SPOTS: ReadonlyArray<LegacyFoodSpot> = [
   {
     id: "ky1",
     name: "기온 마츠다",

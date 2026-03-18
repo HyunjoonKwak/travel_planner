@@ -123,12 +123,10 @@ export function WeatherExchangeCard() {
 
   const firstCity = (config.destinations ?? [])[0] ?? "";
   const coords = CITY_COORDS[firstCity];
-
-  if (!coords) return null;
-
   const currency = COUNTRY_CURRENCY[config.country] ?? COUNTRY_CURRENCY.JP;
 
   useEffect(() => {
+    if (!coords) return;
     setLoading(true);
     Promise.all([
       fetchWeather(coords.lat, coords.lng, coords.name).catch(() => null),
@@ -138,7 +136,9 @@ export function WeatherExchangeCard() {
       setExchange(e);
       setLoading(false);
     });
-  }, [coords.lat, coords.lng, coords.name, currency.code]);
+  }, [coords, currency.code]);
+
+  if (!coords) return null;
 
   if (loading) {
     return (

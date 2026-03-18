@@ -1,7 +1,7 @@
 "use client";
 
 import { CountdownCard } from "@/components/dashboard/countdown-card";
-import { SakuraStatusCard } from "@/components/dashboard/sakura-status-card";
+import { SeasonTipsCard } from "@/components/dashboard/sakura-status-card";
 import { WeatherExchangeCard } from "@/components/dashboard/weather-exchange-card";
 import { TodaySchedule } from "@/components/dashboard/today-schedule";
 import { ExpenseSummary } from "@/components/dashboard/expense-summary";
@@ -55,7 +55,7 @@ export default function DashboardPage() {
         <CountdownCard />
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <SakuraStatusCard />
+          <SeasonTipsCard />
           <WeatherExchangeCard />
         </div>
 

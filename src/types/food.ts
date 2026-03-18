@@ -2,10 +2,12 @@ export interface FoodSpot {
   readonly id: string;
   readonly name: string;
   readonly nameJa: string;
+  readonly nameLocal?: string;
   readonly category: FoodCategory;
   readonly area: string;
   readonly address: string;
   readonly addressJa: string;
+  readonly addressLocal?: string;
   readonly rating: number;
   readonly priceRange: string;
   readonly hours: string;
@@ -31,6 +33,44 @@ export interface FoodSpot {
 }
 
 export type FoodCategory =
+  | "noodles"
+  | "rice"
+  | "street_food"
+  | "seafood"
+  | "bbq"
+  | "soup"
+  | "cafe"
+  | "fine_dining"
+  | "local"
+  | "other";
+
+export const FOOD_CATEGORY_CONFIG: Record<
+  FoodCategory,
+  { label: string; labelJa: string; icon: string }
+> = {
+  noodles: { label: "면 요리", labelJa: "麺料理", icon: "🍜" },
+  rice: { label: "밥 요리", labelJa: "ご飯料理", icon: "🍚" },
+  street_food: { label: "길거리 음식", labelJa: "屋台・B級", icon: "🥡" },
+  seafood: { label: "해산물", labelJa: "海鮮", icon: "🍣" },
+  bbq: { label: "구이", labelJa: "焼肉・BBQ", icon: "🥩" },
+  soup: { label: "국물 요리", labelJa: "スープ", icon: "🍲" },
+  cafe: { label: "카페", labelJa: "カフェ", icon: "☕" },
+  fine_dining: { label: "파인다이닝", labelJa: "高級", icon: "🌟" },
+  local: { label: "현지 맛집", labelJa: "ご当地", icon: "🏮" },
+  other: { label: "기타", labelJa: "その他", icon: "🍽" },
+};
+
+/**
+ * FoodSpot variant that accepts legacy Japanese-specific category names.
+ * Used only for existing static data files (osaka, kyoto).
+ */
+export type LegacyFoodSpot = Omit<FoodSpot, "category"> & { category: LegacyFoodCategory };
+
+/**
+ * Legacy category type for backward compatibility with existing static data
+ * (osaka, kyoto food spots that use Japanese-specific category names).
+ */
+export type LegacyFoodCategory =
   | "ramen"
   | "takoyaki"
   | "okonomiyaki"
@@ -41,21 +81,18 @@ export type FoodCategory =
   | "cafe"
   | "other";
 
-export const FOOD_CATEGORY_CONFIG: Record<
-  FoodCategory,
-  { label: string; labelJa: string; icon: string }
-> = {
-  ramen: { label: "라멘", labelJa: "ラーメン", icon: "🍜" },
-  takoyaki: { label: "타코야키", labelJa: "たこ焼き", icon: "🐙" },
-  okonomiyaki: {
-    label: "오코노미야키",
-    labelJa: "お好み焼き",
-    icon: "🥞",
-  },
-  kushikatsu: { label: "쿠시카츠", labelJa: "串カツ", icon: "🍢" },
-  sushi: { label: "스시", labelJa: "寿司", icon: "🍣" },
-  udon: { label: "우동", labelJa: "うどん", icon: "🍲" },
-  yakiniku: { label: "야키니쿠", labelJa: "焼肉", icon: "🥩" },
-  cafe: { label: "카페", labelJa: "カフェ", icon: "☕" },
-  other: { label: "기타", labelJa: "その他", icon: "🍽" },
+/**
+ * Legacy category aliases for backward compatibility with existing static data.
+ * Old Japanese-specific categories are remapped to the universal taxonomy.
+ */
+export const LEGACY_CATEGORY_MAP: Record<LegacyFoodCategory, FoodCategory> = {
+  ramen: "noodles",
+  udon: "noodles",
+  sushi: "seafood",
+  yakiniku: "bbq",
+  takoyaki: "street_food",
+  okonomiyaki: "street_food",
+  kushikatsu: "street_food",
+  cafe: "cafe",
+  other: "other",
 };
