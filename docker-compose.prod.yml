@@ -1,0 +1,9 @@
+services:
+  travel-planner:
+    image: ghcr.io/${GHCR_USERNAME:-hyunjoonkwak}/travel-planner:${IMAGE_TAG:-latest}
+    container_name: travel-planner
+    ports:
+      - "3900:3000"
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
