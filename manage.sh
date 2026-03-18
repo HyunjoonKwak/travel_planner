@@ -92,7 +92,7 @@ case "$CMD" in
         log_info "이미지 빌드 및 푸시 중..."
         docker buildx build \
             ${NO_CACHE} \
-            --platform linux/amd64,linux/arm64 \
+            --platform ${BUILD_PLATFORM:-linux/amd64} \
             -t ghcr.io/${GHCR_USERNAME}/${APP_NAME}:${IMAGE_TAG} \
             --push \
             .
@@ -137,7 +137,7 @@ case "$CMD" in
 
         docker buildx build \
             ${NO_CACHE} \
-            --platform linux/amd64,linux/arm64 \
+            --platform ${BUILD_PLATFORM:-linux/amd64} \
             -t ghcr.io/${GHCR_USERNAME}/${APP_NAME}:${IMAGE_TAG} \
             --push \
             .
