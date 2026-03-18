@@ -17,6 +17,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { useTripConfig } from "@/hooks/use-trip-config";
+import { DestinationSelector } from "@/components/settings/destination-selector";
+import { ThemeSelector } from "@/components/settings/theme-selector";
+import { getCityById } from "@/lib/data/destinations";
 import { cn } from "@/lib/utils";
 
 const GUIDE_FEATURES = [
@@ -58,12 +61,27 @@ const GUIDE_FEATURES = [
   },
 ] as const;
 
-type Step = "welcome" | "trip-setup" | "guide" | "done";
+type Step = "welcome" | "trip-setup" | "guide";
+
+function buildPreview(
+  destinations: ReadonlyArray<string>,
+  theme: string,
+): string {
+  const names = destinations
+    .map((id) => getCityById(id)?.name)
+    .filter(Boolean)
+    .join("·");
+  if (names && theme) return `${names} ${theme}`;
+  if (names) return `${names} 여행`;
+  if (theme) return `${theme} 여행`;
+  return "";
+}
 
 export function OnboardingDialog() {
   const { config, updateConfig } = useTripConfig();
   const [step, setStep] = useState<Step>("welcome");
-  const [destination, setDestination] = useState("");
+  const [country, setCountry] = useState("");
+  const [destinations, setDestinations] = useState<ReadonlyArray<string>>([]);
   const [tripTheme, setTripTheme] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
@@ -74,9 +92,9 @@ export function OnboardingDialog() {
 
   function handleSetup() {
     updateConfig({
-      // Onboarding keeps a free-text destination; stored as theme until
-      // the user visits settings and selects cities properly.
-      theme: destination ? `${destination}${tripTheme ? ` ${tripTheme}` : ""}` : tripTheme,
+      country,
+      destinations,
+      theme: tripTheme,
       startDate,
       endDate,
     });
@@ -91,18 +109,11 @@ export function OnboardingDialog() {
     updateConfig({ onboarded: true });
   }
 
-  const tripName =
-    destination && tripTheme
-      ? `${destination} ${tripTheme}`
-      : destination
-        ? `${destination} 여행`
-        : tripTheme
-          ? `${tripTheme} 여행`
-          : "여행 플래너";
+  const preview = buildPreview(destinations, tripTheme);
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-      <Card className="w-full max-w-md max-h-[90vh] overflow-y-auto">
+      <Card className="w-full max-w-lg max-h-[90vh] overflow-y-auto">
         <CardContent className="p-6">
           {step === "welcome" && (
             <div className="text-center space-y-6">
@@ -112,14 +123,19 @@ export function OnboardingDialog() {
                 </div>
               </div>
               <div>
-                <h2 className="text-xl font-bold">여행 플래너에 오신 걸 환영합니다!</h2>
+                <h2 className="text-xl font-bold">
+                  여행 플래너에 오신 걸 환영합니다!
+                </h2>
                 <p className="text-sm text-muted-foreground mt-2">
-                  여행 일정, 맛집, 일기, 가계부, 일본어 학습까지
-                  한 곳에서 관리하세요.
+                  여행 일정, 맛집, 일기, 가계부, 일본어 학습까지 한 곳에서
+                  관리하세요.
                 </p>
               </div>
               <div className="space-y-2">
-                <Button className="w-full" onClick={() => setStep("trip-setup")}>
+                <Button
+                  className="w-full"
+                  onClick={() => setStep("trip-setup")}
+                >
                   여행 설정하기
                   <ChevronRight className="h-4 w-4 ml-1" />
                 </Button>
@@ -139,57 +155,48 @@ export function OnboardingDialog() {
               <div>
                 <h2 className="text-lg font-bold">어디로 떠나시나요?</h2>
                 <p className="text-sm text-muted-foreground mt-1">
-                  여행 정보를 입력하면 앱 이름이 자동으로 바뀌어요.
+                  나라와 도시를 선택하고 여행 테마를 골라보세요.
                 </p>
               </div>
 
-              <div className="space-y-4">
+              <DestinationSelector
+                country={country}
+                destinations={destinations}
+                onCountryChange={setCountry}
+                onDestinationsChange={setDestinations}
+              />
+
+              <ThemeSelector value={tripTheme} onChange={setTripTheme} />
+
+              <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label htmlFor="ob-dest">여행지</Label>
+                  <Label htmlFor="ob-start">출발일</Label>
                   <Input
-                    id="ob-dest"
-                    placeholder="예: 오사카, 도쿄, 교토, 후쿠오카"
-                    value={destination}
-                    onChange={(e) => setDestination(e.target.value)}
+                    id="ob-start"
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="ob-theme">여행 테마</Label>
+                  <Label htmlFor="ob-end">귀국일</Label>
                   <Input
-                    id="ob-theme"
-                    placeholder="예: 벚꽃여행, 미식투어, 온천여행"
-                    value={tripTheme}
-                    onChange={(e) => setTripTheme(e.target.value)}
+                    id="ob-end"
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
                   />
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1.5">
-                    <Label htmlFor="ob-start">출발일</Label>
-                    <Input
-                      id="ob-start"
-                      type="date"
-                      value={startDate}
-                      onChange={(e) => setStartDate(e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="ob-end">귀국일</Label>
-                    <Input
-                      id="ob-end"
-                      type="date"
-                      value={endDate}
-                      onChange={(e) => setEndDate(e.target.value)}
-                    />
-                  </div>
                 </div>
               </div>
 
-              {(destination || tripTheme) && (
+              {preview && (
                 <div className="rounded-lg bg-primary/5 border border-primary/20 p-3 flex items-center gap-2">
                   <Sparkles className="h-4 w-4 text-primary flex-shrink-0" />
                   <div>
-                    <p className="text-xs text-muted-foreground">앱 이름 미리보기</p>
-                    <p className="font-semibold text-primary">{tripName}</p>
+                    <p className="text-xs text-muted-foreground">
+                      앱 이름 미리보기
+                    </p>
+                    <p className="font-semibold text-primary">{preview}</p>
                   </div>
                 </div>
               )}
