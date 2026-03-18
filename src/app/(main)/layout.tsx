@@ -2,6 +2,7 @@ import { AppSidebar } from "@/components/layout/app-sidebar";
 import { Header } from "@/components/layout/header";
 import { BottomNav } from "@/components/layout/bottom-nav";
 import { OnboardingDialog } from "@/components/onboarding/onboarding-dialog";
+import { LegacyCleanup } from "@/components/layout/legacy-cleanup";
 
 export default function MainLayout({
   children,
@@ -19,6 +20,7 @@ export default function MainLayout({
       </div>
       <BottomNav />
       <OnboardingDialog />
+      <LegacyCleanup />
     </div>
   );
 }
