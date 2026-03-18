@@ -8,4 +8,5 @@ services:
       - ./data:/app/data
     environment:
       - GOOGLE_PLACES_API_KEY=${GOOGLE_PLACES_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
     restart: unless-stopped

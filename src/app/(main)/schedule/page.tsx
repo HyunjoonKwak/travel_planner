@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { Plus, Map } from "lucide-react";
+import { Plus, Map, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -18,6 +18,7 @@ import { CalendarStrip } from "@/components/schedule/calendar-strip";
 import { FlightBar, HotelBar } from "@/components/schedule/travel-info-bar";
 import { useTripConfig } from "@/hooks/use-trip-config";
 import { useLocalStorage } from "@/hooks/use-local-storage";
+import { AIScheduleDrawer } from "@/components/schedule/ai-schedule-drawer";
 import type { ScheduleItem } from "@/types/schedule";
 
 function generateTripDates(start: string, end: string): string[] {
@@ -54,6 +55,7 @@ export default function SchedulePage() {
     [],
   );
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [aiDrawerOpen, setAiDrawerOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<ScheduleItem | undefined>();
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
 
@@ -122,6 +124,10 @@ export default function SchedulePage() {
     } else {
       handleAddItem(data);
     }
+  }
+
+  function handleAIApply(aiItems: ScheduleItem[]) {
+    setItems((prev) => [...prev, ...aiItems]);
   }
 
   function openAdd() {
@@ -268,13 +274,23 @@ export default function SchedulePage() {
         </TabsContent>
       </Tabs>
 
-      <Button
-        size="icon"
-        className="fixed bottom-20 right-4 h-14 w-14 rounded-full shadow-lg z-20"
-        onClick={openAdd}
-      >
-        <Plus className="h-6 w-6" />
-      </Button>
+      <div className="fixed bottom-20 right-4 z-20 flex flex-col gap-2">
+        <Button
+          size="icon"
+          variant="outline"
+          className="h-12 w-12 rounded-full shadow-lg bg-background"
+          onClick={() => setAiDrawerOpen(true)}
+        >
+          <Sparkles className="h-5 w-5 text-primary" />
+        </Button>
+        <Button
+          size="icon"
+          className="h-14 w-14 rounded-full shadow-lg"
+          onClick={openAdd}
+        >
+          <Plus className="h-6 w-6" />
+        </Button>
+      </div>
 
       <Drawer open={drawerOpen} onOpenChange={setDrawerOpen}>
         <DrawerContent>
@@ -292,6 +308,11 @@ export default function SchedulePage() {
           </div>
         </DrawerContent>
       </Drawer>
+      <AIScheduleDrawer
+        open={aiDrawerOpen}
+        onOpenChange={setAiDrawerOpen}
+        onApply={handleAIApply}
+      />
     </div>
   );
 }
