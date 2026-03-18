@@ -1,5 +1,8 @@
+"use client";
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
+import { useTripConfig } from "@/hooks/use-trip-config";
 import { getDday } from "@/lib/utils/date";
 
 const FULL_BLOOM_DATE = "2026-03-31";
@@ -8,13 +11,10 @@ const BLOOM_START_DATE = "2026-03-20";
 function calcBloomPercent(): number {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-
   const start = new Date(BLOOM_START_DATE);
   const fullBloom = new Date(FULL_BLOOM_DATE);
-
   if (today < start) return 0;
   if (today >= fullBloom) return 100;
-
   const total = fullBloom.getTime() - start.getTime();
   const elapsed = today.getTime() - start.getTime();
   return Math.round((elapsed / total) * 100);
@@ -29,6 +29,13 @@ function getBloomLabel(percent: number): string {
 }
 
 export function SakuraStatusCard() {
+  const { config } = useTripConfig();
+
+  // 벚꽃여행 또는 일본 여행이 아니면 표시 안 함
+  const isSakuraTheme = config.theme === "벚꽃여행";
+  const isJapan = config.country === "JP";
+  if (!isSakuraTheme && !isJapan) return null;
+
   const bloomPercent = calcBloomPercent();
   const bloomLabel = getBloomLabel(bloomPercent);
   const daysToFullBloom = getDday(FULL_BLOOM_DATE);
@@ -48,7 +55,6 @@ export function SakuraStatusCard() {
             3월 31일
           </span>
         </div>
-
         <div className="space-y-2">
           <div className="flex justify-between text-sm">
             <span>{bloomLabel}</span>
@@ -59,7 +65,6 @@ export function SakuraStatusCard() {
             className="h-3 [&>div]:bg-pink-400"
           />
         </div>
-
         <p className="text-xs text-muted-foreground text-center">
           {daysToFullBloom > 0
             ? `만개까지 ${daysToFullBloom}일 남았습니다`
