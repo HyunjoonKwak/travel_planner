@@ -140,9 +140,9 @@ export default function FoodPage() {
     [effectiveDestinations]
   );
 
-  const addedPlaceIds = useMemo(
+  const addedPlaceIds: Set<string> = useMemo(
     () =>
-      new Set(
+      new Set<string>(
         userSpots.map((s) => s.placeId).filter((id): id is string => !!id)
       ),
     [userSpots]
