@@ -20,8 +20,9 @@ export async function GET(): Promise<NextResponse> {
     const all = await db.select().from(trips).orderBy(desc(trips.createdAt));
     return NextResponse.json({ success: true, data: all });
   } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
     return NextResponse.json(
-      { success: false, error: "Failed to fetch trips" },
+      { success: false, error: msg },
       { status: 500 }
     );
   }
@@ -56,8 +57,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     await db.insert(trips).values(newTrip);
     return NextResponse.json({ success: true, data: newTrip }, { status: 201 });
   } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
     return NextResponse.json(
-      { success: false, error: "Failed to create trip" },
+      { success: false, error: msg },
       { status: 500 }
     );
   }
