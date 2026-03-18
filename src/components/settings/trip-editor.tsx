@@ -98,6 +98,7 @@ export function TripEditor({ trip, onSave, onCancel }: TripEditorProps) {
   // Budget
   const [inputCurrency, setInputCurrency] = useState<"JPY" | "KRW">("JPY");
   const [totalJpy, setTotalJpy] = useState(savedBudget?.totalBudget ?? 0);
+  const [totalInput, setTotalInput] = useState(String(savedBudget?.totalBudget ?? ""));
   const [categories, setCategories] = useState<Categories>(
     savedBudget?.categories ?? { food: 0, transport: 0, shopping: 0, accommodation: 0, sightseeing: 0, other: 0 },
   );
@@ -143,8 +144,10 @@ export function TripEditor({ trip, onSave, onCancel }: TripEditorProps) {
   const unallocatedJpy = totalJpy - allocated;
   const unallocatedDisplay = inputCurrency === "JPY" ? unallocatedJpy : jpyToKrw(unallocatedJpy);
 
-  function handleTotalChange(value: number) {
-    const jpyVal = inputCurrency === "JPY" ? value : krwToJpy(value);
+  function handleTotalChange(rawValue: string) {
+    setTotalInput(rawValue);
+    const num = Number(rawValue) || 0;
+    const jpyVal = inputCurrency === "JPY" ? num : krwToJpy(num);
     setTotalJpy(jpyVal);
     if (jpyVal > 0) {
       setCategories({
@@ -266,14 +269,21 @@ export function TripEditor({ trip, onSave, onCancel }: TripEditorProps) {
           <div className="space-y-1.5">
             <div className="flex items-center justify-between">
               <Label htmlFor="budget-total">총 예산</Label>
-              <button type="button" onClick={() => setInputCurrency((p) => (p === "JPY" ? "KRW" : "JPY"))} className="flex items-center gap-1.5 text-xs font-medium text-green-600 hover:text-green-700 rounded-full border border-green-300 px-2.5 py-1">
+              <button type="button" onClick={() => {
+                setInputCurrency((p) => {
+                  const next = p === "JPY" ? "KRW" : "JPY";
+                  const converted = next === "JPY" ? totalJpy : jpyToKrw(totalJpy);
+                  setTotalInput(converted ? String(converted) : "");
+                  return next;
+                });
+              }} className="flex items-center gap-1.5 text-xs font-medium text-green-600 hover:text-green-700 rounded-full border border-green-300 px-2.5 py-1">
                 <ArrowRightLeft className="h-3 w-3" />
                 {inputCurrency === "JPY" ? "엔화 (JPY)" : "원화 (KRW)"}
               </button>
             </div>
             <div className="relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-medium">{inputSymbol}</span>
-              <Input id="budget-total" type="number" placeholder={inputCurrency === "JPY" ? "300000" : "2670000"} value={displayTotal || ""} onChange={(e) => handleTotalChange(Number(e.target.value) || 0)} className="pl-7" />
+              <Input id="budget-total" type="number" placeholder={inputCurrency === "JPY" ? "300000" : "2670000"} value={totalInput} onChange={(e) => handleTotalChange(e.target.value)} className="pl-7" />
             </div>
             {totalJpy > 0 && (
               <p className="text-xs text-muted-foreground">≈ {convertedSymbol}{convertedTotal.toLocaleString()}<span className="ml-2 text-muted-foreground/60">(1¥ ≈ ₩8.9)</span></p>
