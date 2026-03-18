@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, Noto_Sans_JP } from "next/font/google";
+import { Inter } from "next/font/google";
 import { ThemeProvider } from "next-themes";
 import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
@@ -7,13 +7,6 @@ import "./globals.css";
 const inter = Inter({
   variable: "--font-sans",
   subsets: ["latin"],
-  display: "swap",
-});
-
-const notoSansJP = Noto_Sans_JP({
-  variable: "--font-jp",
-  subsets: ["latin"],
-  weight: ["400", "500", "700"],
   display: "swap",
 });
 
@@ -46,8 +39,15 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ko" suppressHydrationWarning>
+      <head>
+        <link
+          href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap"
+          rel="stylesheet"
+        />
+      </head>
       <body
-        className={`${inter.variable} ${notoSansJP.variable} antialiased font-sans`}
+        className={`${inter.variable} antialiased font-sans`}
+        style={{ fontFamily: "'Inter', 'Noto Sans JP', system-ui, sans-serif" }}
       >
         <ThemeProvider
           attribute="class"
