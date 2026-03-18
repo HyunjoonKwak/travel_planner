@@ -151,9 +151,10 @@ function TimelineView({ entries }: { readonly entries: JournalEntryType[] }) {
 
 export default function JournalPage() {
   const { activeTrip, loading: tripLoading } = useActiveTrip();
-  const { items: dbEntries, loading: journalLoading } = useTripJournal(activeTrip?.id ?? "");
+  const tripId = activeTrip?.id ?? "";
+  const { items: dbEntries, loading: journalLoading } = useTripJournal(tripId);
 
-  if (tripLoading || journalLoading) {
+  if (tripLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />

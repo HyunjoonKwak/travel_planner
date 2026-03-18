@@ -11,7 +11,11 @@ function useTripResource<T>(tripId: string, resourcePath: string) {
   const baseUrl = `/api/trips/${tripId}/${resourcePath}`;
 
   const refresh = useCallback(async () => {
-    if (!tripId) return;
+    if (!tripId) {
+      setLoading(false);
+      setItems([]);
+      return;
+    }
     try {
       setLoading(true);
       setError(null);
