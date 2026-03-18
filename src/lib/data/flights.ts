@@ -71,6 +71,40 @@ export const FLIGHT_ROUTES: ReadonlyArray<FlightRoute> = [
   // Korean Air - Okinawa
   { flightNumber: "KE733", airline: "대한항공", departureAirport: "ICN", departureCity: "인천", arrivalAirport: "OKA", arrivalCity: "오키나와", departureTime: "10:10", arrivalTime: "12:30" },
   { flightNumber: "KE734", airline: "대한항공", departureAirport: "OKA", departureCity: "오키나와", arrivalAirport: "ICN", arrivalCity: "인천", departureTime: "13:40", arrivalTime: "15:50" },
+  // Taiwan - Taipei TPE
+  { flightNumber: "KE691", airline: "대한항공", departureAirport: "ICN", departureCity: "인천", arrivalAirport: "TPE", arrivalCity: "타이베이", departureTime: "08:40", arrivalTime: "10:20" },
+  { flightNumber: "KE692", airline: "대한항공", departureAirport: "TPE", departureCity: "타이베이", arrivalAirport: "ICN", arrivalCity: "인천", departureTime: "11:35", arrivalTime: "15:15" },
+  { flightNumber: "OZ711", airline: "아시아나항공", departureAirport: "ICN", departureCity: "인천", arrivalAirport: "TPE", arrivalCity: "타이베이", departureTime: "09:30", arrivalTime: "11:15" },
+  { flightNumber: "OZ712", airline: "아시아나항공", departureAirport: "TPE", departureCity: "타이베이", arrivalAirport: "ICN", arrivalCity: "인천", departureTime: "12:25", arrivalTime: "16:05" },
+  { flightNumber: "CI161", airline: "중화항공", departureAirport: "ICN", departureCity: "인천", arrivalAirport: "TPE", arrivalCity: "타이베이", departureTime: "10:15", arrivalTime: "12:00" },
+  { flightNumber: "CI162", airline: "중화항공", departureAirport: "TPE", departureCity: "타이베이", arrivalAirport: "ICN", arrivalCity: "인천", departureTime: "13:10", arrivalTime: "16:50" },
+  // Thailand - Bangkok BKK (Suvarnabhumi)
+  { flightNumber: "KE651", airline: "대한항공", departureAirport: "ICN", departureCity: "인천", arrivalAirport: "BKK", arrivalCity: "방콕", departureTime: "09:30", arrivalTime: "14:05" },
+  { flightNumber: "KE652", airline: "대한항공", departureAirport: "BKK", departureCity: "방콕", arrivalAirport: "ICN", arrivalCity: "인천", departureTime: "15:45", arrivalTime: "23:05" },
+  { flightNumber: "OZ741", airline: "아시아나항공", departureAirport: "ICN", departureCity: "인천", arrivalAirport: "BKK", arrivalCity: "방콕", departureTime: "08:10", arrivalTime: "12:50" },
+  { flightNumber: "OZ742", airline: "아시아나항공", departureAirport: "BKK", departureCity: "방콕", arrivalAirport: "ICN", arrivalCity: "인천", departureTime: "14:10", arrivalTime: "21:30" },
+  { flightNumber: "TG658", airline: "타이항공", departureAirport: "ICN", departureCity: "인천", arrivalAirport: "BKK", arrivalCity: "방콕", departureTime: "10:50", arrivalTime: "15:25" },
+  { flightNumber: "TG659", airline: "타이항공", departureAirport: "BKK", departureCity: "방콕", arrivalAirport: "ICN", arrivalCity: "인천", departureTime: "17:10", arrivalTime: "00:35" },
+  // Thailand - Chiang Mai CNX
+  { flightNumber: "TG6741", airline: "타이항공", departureAirport: "ICN", departureCity: "인천", arrivalAirport: "CNX", arrivalCity: "치앙마이", departureTime: "09:00", arrivalTime: "14:30" },
+  { flightNumber: "TG6742", airline: "타이항공", departureAirport: "CNX", departureCity: "치앙마이", arrivalAirport: "ICN", arrivalCity: "인천", departureTime: "16:30", arrivalTime: "00:10" },
+  { flightNumber: "FD3250", airline: "에어아시아", departureAirport: "ICN", departureCity: "인천", arrivalAirport: "CNX", arrivalCity: "치앙마이", departureTime: "10:20", arrivalTime: "15:40" },
+  { flightNumber: "FD3251", airline: "에어아시아", departureAirport: "CNX", departureCity: "치앙마이", arrivalAirport: "ICN", arrivalCity: "인천", departureTime: "17:05", arrivalTime: "23:45" },
+  // Vietnam - Hanoi HAN
+  { flightNumber: "KE683", airline: "대한항공", departureAirport: "ICN", departureCity: "인천", arrivalAirport: "HAN", arrivalCity: "하노이", departureTime: "09:15", arrivalTime: "12:55" },
+  { flightNumber: "KE684", airline: "대한항공", departureAirport: "HAN", departureCity: "하노이", arrivalAirport: "ICN", arrivalCity: "인천", departureTime: "14:30", arrivalTime: "21:40" },
+  { flightNumber: "OZ731", airline: "아시아나항공", departureAirport: "ICN", departureCity: "인천", arrivalAirport: "HAN", arrivalCity: "하노이", departureTime: "08:00", arrivalTime: "11:40" },
+  { flightNumber: "VN416", airline: "베트남항공", departureAirport: "ICN", departureCity: "인천", arrivalAirport: "HAN", arrivalCity: "하노이", departureTime: "10:30", arrivalTime: "14:10" },
+  // Vietnam - Ho Chi Minh SGN
+  { flightNumber: "KE671", airline: "대한항공", departureAirport: "ICN", departureCity: "인천", arrivalAirport: "SGN", arrivalCity: "호치민", departureTime: "10:00", arrivalTime: "14:00" },
+  { flightNumber: "KE672", airline: "대한항공", departureAirport: "SGN", departureCity: "호치민", arrivalAirport: "ICN", arrivalCity: "인천", departureTime: "15:40", arrivalTime: "23:00" },
+  { flightNumber: "OZ735", airline: "아시아나항공", departureAirport: "ICN", departureCity: "인천", arrivalAirport: "SGN", arrivalCity: "호치민", departureTime: "08:40", arrivalTime: "12:50" },
+  { flightNumber: "VN420", airline: "베트남항공", departureAirport: "ICN", departureCity: "인천", arrivalAirport: "SGN", arrivalCity: "호치민", departureTime: "11:00", arrivalTime: "15:05" },
+  // Vietnam - Da Nang DAD
+  { flightNumber: "KE677", airline: "대한항공", departureAirport: "ICN", departureCity: "인천", arrivalAirport: "DAD", arrivalCity: "다낭", departureTime: "09:45", arrivalTime: "13:05" },
+  { flightNumber: "KE678", airline: "대한항공", departureAirport: "DAD", departureCity: "다낭", arrivalAirport: "ICN", arrivalCity: "인천", departureTime: "14:25", arrivalTime: "21:15" },
+  { flightNumber: "VN436", airline: "베트남항공", departureAirport: "ICN", departureCity: "인천", arrivalAirport: "DAD", arrivalCity: "다낭", departureTime: "10:10", arrivalTime: "13:30" },
+  { flightNumber: "VN437", airline: "베트남항공", departureAirport: "DAD", departureCity: "다낭", arrivalAirport: "ICN", arrivalCity: "인천", departureTime: "15:00", arrivalTime: "21:50" },
 ];
 
 export function searchFlights(query: string): ReadonlyArray<FlightRoute> {

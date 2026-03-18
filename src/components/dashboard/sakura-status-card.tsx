@@ -187,9 +187,6 @@ function getSeasonHighlights(
   return null;
 }
 
-/** @deprecated Use SeasonTipsCard */
-export const SakuraStatusCard = SeasonTipsCard;
-
 export function SeasonTipsCard() {
   const { config } = useTripConfig();
 
@@ -226,3 +223,6 @@ export function SeasonTipsCard() {
     </Card>
   );
 }
+
+/** @deprecated Use SeasonTipsCard */
+export const SakuraStatusCard = SeasonTipsCard;

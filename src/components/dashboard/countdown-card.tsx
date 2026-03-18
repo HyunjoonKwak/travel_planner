@@ -7,58 +7,60 @@ import { Plane } from "lucide-react";
 
 export function CountdownCard() {
   const { config, getTripName } = useTripConfig();
-  const startDate = config.startDate || "2026-04-01";
-  const endDate = config.endDate || "2026-04-05";
-  const dday = getDday(startDate);
+  const startDate = config.startDate;
+  const endDate = config.endDate;
+  const dday = startDate ? getDday(startDate) : null;
 
   const label =
-    dday > 0 ? `D-${dday}` : dday === 0 ? "D-Day!" : `D+${Math.abs(dday)}`;
+    dday === null
+      ? null
+      : dday > 0
+        ? `D-${dday}`
+        : dday === 0
+          ? "D-Day!"
+          : `D+${Math.abs(dday)}`;
 
-  const startShort = startDate.slice(5).replace("-", "/");
-  const endShort = endDate.slice(5).replace("-", "/");
+  const startShort = startDate ? startDate.slice(5).replace("-", "/") : "";
+  const endShort = endDate ? endDate.slice(5).replace("-", "/") : "";
 
   const outbound = config.outboundFlight;
   const hotel = config.hotel;
 
   return (
-    <Card className="border-pink-200 bg-gradient-to-br from-pink-50 to-rose-50 dark:from-pink-950/30 dark:to-rose-950/30 dark:border-pink-800">
+    <Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-primary/10 dark:from-primary/10 dark:to-primary/20">
       <CardHeader className="pb-2">
-        <CardTitle className="flex items-center gap-2 text-pink-700 dark:text-pink-300">
+        <CardTitle className="flex items-center gap-2 text-primary">
           <Plane className="h-5 w-5" />
           <span>{getTripName()} 카운트다운</span>
         </CardTitle>
       </CardHeader>
       <CardContent>
         <div className="flex flex-col items-center gap-3 py-2">
-          <div className="text-5xl font-bold text-pink-600 dark:text-pink-400">
-            {label}
-          </div>
-          {config.startDate && (
+          {label ? (
+            <div className="text-5xl font-bold text-primary">{label}</div>
+          ) : (
+            <div className="text-base font-medium text-muted-foreground">
+              출발일을 설정해주세요
+            </div>
+          )}
+          {startDate && endDate && (
             <div className="text-sm text-muted-foreground">
               여행 기간:{" "}
-              <span className="font-medium text-pink-600 dark:text-pink-400">
+              <span className="font-medium text-primary">
                 {startShort} ~ {endShort}
               </span>
             </div>
           )}
-          {!config.startDate && (
-            <p className="text-sm text-muted-foreground">
-              설정에서 여행 일정을 입력하세요
-            </p>
-          )}
-          <p className="text-xs text-center text-muted-foreground">
-            {startDate} ~ {endDate}
-          </p>
           {(outbound || hotel) && (
-            <div className="w-full space-y-1 pt-1 border-t border-pink-200 dark:border-pink-800">
+            <div className="w-full space-y-1 pt-1 border-t border-primary/20">
               {outbound && (
-                <p className="text-xs text-center text-pink-600 dark:text-pink-400">
+                <p className="text-xs text-center text-primary">
                   ✈ {outbound.flightNumber} {outbound.departureAirport}→
                   {outbound.arrivalAirport} {outbound.departureTime}
                 </p>
               )}
               {hotel && (
-                <p className="text-xs text-center text-pink-600 dark:text-pink-400">
+                <p className="text-xs text-center text-primary">
                   🏨 {hotel.name}
                 </p>
               )}
