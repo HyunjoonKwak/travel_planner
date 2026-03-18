@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useRef, ChangeEvent } from "react";
-import { useRouter } from "next/navigation";
-import { ArrowLeft, MapPin, Camera, Image, X, Loader2 } from "lucide-react";
+import { useState, useRef, ChangeEvent, useEffect, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { ArrowLeft, MapPin, Camera, Image, X, Loader2, Calendar } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -13,6 +13,7 @@ import { usePhotos } from "@/hooks/use-photos";
 import { JournalEntry, Mood, MOOD_CONFIG } from "@/types/journal";
 import { formatDateKo, generateId } from "@/lib/utils/date";
 import { cn } from "@/lib/utils";
+import { PhotoThumbnail } from "@/components/journal/photo-thumbnail";
 
 const STORAGE_KEY = "journal_entries";
 const MOOD_KEYS = Object.keys(MOOD_CONFIG) as Mood[];
@@ -22,8 +23,11 @@ interface PendingPhoto {
   readonly previewUrl: string;
 }
 
-export default function JournalWritePage() {
+function JournalWriteForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const editId = searchParams.get("edit");
+
   const [entries, setEntries] = useLocalStorage<JournalEntry[]>(STORAGE_KEY, []);
   const { upload } = usePhotos();
 
@@ -32,11 +36,30 @@ export default function JournalWritePage() {
 
   const today = new Date().toISOString().split("T")[0];
 
+  const [date, setDate] = useState(today);
   const [content, setContent] = useState("");
   const [location, setLocation] = useState("");
   const [mood, setMood] = useState<Mood>("happy");
   const [pendingPhotos, setPendingPhotos] = useState<PendingPhoto[]>([]);
+  const [existingPhotoIds, setExistingPhotoIds] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
+  const [initialized, setInitialized] = useState(false);
+
+  // Pre-fill form when editing
+  useEffect(() => {
+    if (initialized) return;
+    if (editId) {
+      const target = entries.find((e) => e.id === editId);
+      if (target) {
+        setDate(target.date);
+        setContent(target.content);
+        setLocation(target.location ?? "");
+        setMood(target.mood);
+        setExistingPhotoIds([...(target.photoIds ?? [])]);
+      }
+    }
+    setInitialized(true);
+  }, [editId, entries, initialized]);
 
   async function handlePhotoChange(e: ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files ?? []);
@@ -58,7 +81,7 @@ export default function JournalWritePage() {
     }
   }
 
-  function removePhoto(id: string) {
+  function removeNewPhoto(id: string) {
     setPendingPhotos((prev) => {
       const removed = prev.find((p) => p.id === id);
       if (removed) URL.revokeObjectURL(removed.previewUrl);
@@ -66,33 +89,65 @@ export default function JournalWritePage() {
     });
   }
 
+  function removeExistingPhoto(id: string) {
+    setExistingPhotoIds((prev) => prev.filter((p) => p !== id));
+  }
+
   function handleSave() {
     if (!content.trim()) return;
 
     const now = new Date().toISOString();
-    const newEntry: JournalEntry = {
-      id: generateId(),
-      date: today,
-      content: content.trim(),
-      location: location.trim() || undefined,
-      mood,
-      photoIds: pendingPhotos.map((p) => p.id),
-      createdAt: now,
-      updatedAt: now,
-    };
+    const allPhotoIds = [
+      ...existingPhotoIds,
+      ...pendingPhotos.map((p) => p.id),
+    ];
 
-    setEntries((prev) => [newEntry, ...prev]);
-
-    // Revoke preview object URLs after save
-    pendingPhotos.forEach((p) => URL.revokeObjectURL(p.previewUrl));
-
-    router.push("/journal");
+    if (editId) {
+      setEntries((prev) =>
+        prev.map((e) =>
+          e.id === editId
+            ? {
+                ...e,
+                date,
+                content: content.trim(),
+                location: location.trim() || undefined,
+                mood,
+                photoIds: allPhotoIds,
+                photos: undefined,
+                updatedAt: now,
+              }
+            : e,
+        ),
+      );
+      pendingPhotos.forEach((p) => URL.revokeObjectURL(p.previewUrl));
+      router.push(`/journal/${editId}`);
+    } else {
+      const newEntry: JournalEntry = {
+        id: generateId(),
+        date,
+        content: content.trim(),
+        location: location.trim() || undefined,
+        mood,
+        photoIds: allPhotoIds,
+        createdAt: now,
+        updatedAt: now,
+      };
+      setEntries((prev) => [newEntry, ...prev]);
+      pendingPhotos.forEach((p) => URL.revokeObjectURL(p.previewUrl));
+      router.push("/journal");
+    }
   }
 
   function handleCancel() {
     pendingPhotos.forEach((p) => URL.revokeObjectURL(p.previewUrl));
-    router.push("/journal");
+    if (editId) {
+      router.push(`/journal/${editId}`);
+    } else {
+      router.push("/journal");
+    }
   }
+
+  const isEditing = Boolean(editId);
 
   return (
     <div className="min-h-screen pb-10">
@@ -101,7 +156,9 @@ export default function JournalWritePage() {
         <Button variant="ghost" size="icon" onClick={handleCancel}>
           <ArrowLeft className="h-5 w-5" />
         </Button>
-        <h1 className="text-lg font-semibold">일기 쓰기</h1>
+        <h1 className="text-lg font-semibold">
+          {isEditing ? "일기 수정" : "일기 쓰기"}
+        </h1>
         <Button
           size="sm"
           onClick={handleSave}
@@ -112,14 +169,25 @@ export default function JournalWritePage() {
       </div>
 
       <div className="px-4 space-y-4">
-        {/* Date */}
-        <p className="text-sm font-medium text-muted-foreground">
-          {formatDateKo(today)}
-        </p>
+        {/* Date picker */}
+        <div className="space-y-2">
+          <Label htmlFor="date">날짜</Label>
+          <div className="relative">
+            <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+            <Input
+              id="date"
+              type="date"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+              className="pl-9"
+            />
+          </div>
+          <p className="text-xs text-muted-foreground">{formatDateKo(date)}</p>
+        </div>
 
         {/* Mood selector */}
         <div className="space-y-2">
-          <Label>오늘의 기분</Label>
+          <Label>기분</Label>
           <div className="flex gap-2">
             {MOOD_KEYS.map((m) => {
               const config = MOOD_CONFIG[m];
@@ -161,7 +229,7 @@ export default function JournalWritePage() {
 
         {/* Content */}
         <div className="space-y-2">
-          <Label htmlFor="content">오늘의 기록</Label>
+          <Label htmlFor="content">기록</Label>
           <Textarea
             id="content"
             placeholder="오늘 하루를 기록해보세요..."
@@ -175,6 +243,34 @@ export default function JournalWritePage() {
         {/* Photo upload */}
         <div className="space-y-2">
           <Label>사진</Label>
+
+          {/* Existing photos (edit mode) */}
+          {existingPhotoIds.length > 0 && (
+            <div className="flex gap-2 overflow-x-auto pb-1">
+              {existingPhotoIds.map((id, index) => (
+                <div
+                  key={id}
+                  className="relative h-20 w-20 flex-shrink-0 rounded-md overflow-hidden bg-muted"
+                >
+                  <PhotoThumbnail
+                    photoRef={id}
+                    alt={`기존 사진 ${index + 1}`}
+                    className="h-full w-full object-cover"
+                  />
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      removeExistingPhoto(id);
+                    }}
+                    className="absolute top-1 right-1 rounded-full bg-black/60 p-0.5"
+                    aria-label={`사진 ${index + 1} 삭제`}
+                  >
+                    <X className="h-3 w-3 text-white" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
 
           {/* Camera / Gallery buttons */}
           <div className="grid grid-cols-2 gap-2">
@@ -225,7 +321,7 @@ export default function JournalWritePage() {
             </div>
           )}
 
-          {/* Photo previews */}
+          {/* New photo previews */}
           {pendingPhotos.length > 0 && (
             <div className="flex gap-2 overflow-x-auto pb-1">
               {pendingPhotos.map((photo, index) => (
@@ -236,13 +332,13 @@ export default function JournalWritePage() {
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={photo.previewUrl}
-                    alt={`사진 ${index + 1}`}
+                    alt={`새 사진 ${index + 1}`}
                     className="h-full w-full object-cover"
                   />
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      removePhoto(photo.id);
+                      removeNewPhoto(photo.id);
                     }}
                     className="absolute top-1 right-1 rounded-full bg-black/60 p-0.5"
                     aria-label={`사진 ${index + 1} 삭제`}
@@ -261,5 +357,14 @@ export default function JournalWritePage() {
         </Button>
       </div>
     </div>
+  );
+}
+
+
+export default function JournalWritePage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen" />}>
+      <JournalWriteForm />
+    </Suspense>
   );
 }

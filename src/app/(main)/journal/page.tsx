@@ -51,17 +51,56 @@ function GalleryView({ entries }: { readonly entries: JournalEntryType[] }) {
   return (
     <div className="grid grid-cols-3 gap-1">
       {photos.map(({ photoRef, entry }, index) => (
-        <div
+        <Link
           key={`${entry.id}-${index}`}
-          className="relative aspect-square overflow-hidden bg-muted"
+          href={`/journal/${entry.id}`}
+          className="relative aspect-square overflow-hidden bg-muted group"
         >
           <PhotoThumbnail
             photoRef={photoRef}
             alt={`${entry.date} 사진`}
-            className="h-full w-full object-cover"
+            className="h-full w-full object-cover transition-opacity group-active:opacity-80"
           />
-        </div>
+          {/* Date overlay */}
+          <div className="absolute bottom-0 left-0 right-0 bg-black/50 px-1.5 py-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            <p className="text-white text-[10px] leading-tight truncate">
+              {entry.date.slice(5).replace("-", "/")}
+            </p>
+          </div>
+        </Link>
       ))}
+    </div>
+  );
+}
+
+function TimelineView({ entries }: { readonly entries: JournalEntryType[] }) {
+  // Group entries by date
+  const grouped = entries.reduce<Record<string, JournalEntryType[]>>((acc, entry) => {
+    const existing = acc[entry.date] ?? [];
+    return { ...acc, [entry.date]: [...existing, entry] };
+  }, {});
+
+  const sortedDates = Object.keys(grouped).sort(
+    (a, b) => new Date(b).getTime() - new Date(a).getTime(),
+  );
+
+  return (
+    <div className="space-y-4">
+      {sortedDates.map((date) => {
+        const dayEntries = grouped[date];
+        return (
+          <div key={date} className="space-y-2">
+            {dayEntries.length > 1 && (
+              <p className="text-xs text-muted-foreground px-1">
+                {date} · {dayEntries.length}개
+              </p>
+            )}
+            {dayEntries.map((entry) => (
+              <JournalEntry key={entry.id} entry={entry} truncate />
+            ))}
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -104,11 +143,7 @@ export default function JournalPage() {
           {sortedEntries.length === 0 ? (
             <EmptyState />
           ) : (
-            <div className="space-y-3">
-              {sortedEntries.map((entry) => (
-                <JournalEntry key={entry.id} entry={entry} truncate />
-              ))}
-            </div>
+            <TimelineView entries={sortedEntries} />
           )}
         </TabsContent>
 

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { JournalEntry as JournalEntryType, MOOD_CONFIG } from "@/types/journal";
@@ -31,7 +32,8 @@ export function JournalEntry({ entry, truncate = true }: JournalEntryProps) {
   const photoCount = photoRefs.length;
 
   return (
-    <Card className="w-full">
+    <Link href={`/journal/${entry.id}`} className="block">
+    <Card className="w-full transition-colors hover:bg-muted/40 active:bg-muted/60 cursor-pointer">
       <CardContent className="p-4 space-y-3">
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -95,5 +97,6 @@ export function JournalEntry({ entry, truncate = true }: JournalEntryProps) {
         </div>
       </CardContent>
     </Card>
+    </Link>
   );
 }
