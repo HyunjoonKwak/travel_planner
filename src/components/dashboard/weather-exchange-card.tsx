@@ -13,6 +13,16 @@ interface WeatherData {
   readonly humidity: number;
   readonly windSpeed: number;
   readonly city: string;
+  readonly date: string;
+}
+
+interface DailyForecast {
+  readonly date: string;
+  readonly weekday: string;
+  readonly tempMax: number;
+  readonly tempMin: number;
+  readonly condition: string;
+  readonly icon: string;
 }
 
 interface ExchangeData {
@@ -21,7 +31,6 @@ interface ExchangeData {
 }
 
 const CITY_COORDS: Record<string, { lat: number; lng: number; name: string }> = {
-  // Japan
   osaka: { lat: 34.69, lng: 135.50, name: "오사카" },
   kyoto: { lat: 35.01, lng: 135.77, name: "교토" },
   tokyo: { lat: 35.68, lng: 139.69, name: "도쿄" },
@@ -34,18 +43,15 @@ const CITY_COORDS: Record<string, { lat: number; lng: number; name: string }> = 
   nagoya: { lat: 35.18, lng: 136.91, name: "나고야" },
   yokohama: { lat: 35.44, lng: 139.64, name: "요코하마" },
   hakone: { lat: 35.23, lng: 139.11, name: "하코네" },
-  // Taiwan
   taipei: { lat: 25.03, lng: 121.57, name: "타이베이" },
   kaohsiung: { lat: 22.63, lng: 120.30, name: "가오슝" },
   tainan: { lat: 22.99, lng: 120.21, name: "타이난" },
   taichung: { lat: 24.15, lng: 120.67, name: "타이중" },
   jiufen: { lat: 25.11, lng: 121.84, name: "지우펀" },
-  // Thailand
   bangkok: { lat: 13.76, lng: 100.50, name: "방콕" },
   chiangmai: { lat: 18.79, lng: 98.98, name: "치앙마이" },
   phuket: { lat: 7.88, lng: 98.39, name: "푸켓" },
   pattaya: { lat: 12.93, lng: 100.88, name: "파타야" },
-  // Vietnam
   hanoi: { lat: 21.03, lng: 105.85, name: "하노이" },
   hochiminh: { lat: 10.82, lng: 106.63, name: "호치민" },
   danang: { lat: 16.05, lng: 108.22, name: "다낭" },
@@ -74,26 +80,55 @@ const WMO_CODES: Record<number, { condition: string; icon: string }> = {
   95: { condition: "뇌우", icon: "⛈" },
 };
 
+const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
+
+interface WeatherResult {
+  readonly current: WeatherData;
+  readonly forecast: ReadonlyArray<DailyForecast>;
+}
+
 async function fetchWeather(
   lat: number,
   lng: number,
   cityName: string,
-): Promise<WeatherData> {
-  const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m,apparent_temperature&timezone=auto`;
+): Promise<WeatherResult> {
+  const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m,apparent_temperature&daily=temperature_2m_max,temperature_2m_min,weather_code&timezone=auto&forecast_days=4`;
   const res = await globalThis.fetch(url);
   const data = await res.json();
-  const current = data.current;
-  const code = current?.weather_code ?? 0;
+  const c = data.current;
+  const code = c?.weather_code ?? 0;
   const wmo = WMO_CODES[code] ?? { condition: "알 수 없음", icon: "🌡" };
+  const today = new Date().toISOString().slice(0, 10);
+
+  const daily = data.daily;
+  const forecast: DailyForecast[] = (daily?.time ?? [])
+    .slice(1, 4)
+    .map((date: string, i: number) => {
+      const dayCode = daily.weather_code?.[i + 1] ?? 0;
+      const dayWmo = WMO_CODES[dayCode] ?? { condition: "?", icon: "🌡" };
+      const d = new Date(date);
+      return {
+        date: `${d.getMonth() + 1}/${d.getDate()}`,
+        weekday: WEEKDAYS[d.getDay()],
+        tempMax: Math.round(daily.temperature_2m_max?.[i + 1] ?? 0),
+        tempMin: Math.round(daily.temperature_2m_min?.[i + 1] ?? 0),
+        condition: dayWmo.condition,
+        icon: dayWmo.icon,
+      };
+    });
 
   return {
-    temp: Math.round(current?.temperature_2m ?? 0),
-    feelsLike: Math.round(current?.apparent_temperature ?? 0),
-    condition: wmo.condition,
-    icon: wmo.icon,
-    humidity: Math.round(current?.relative_humidity_2m ?? 0),
-    windSpeed: Math.round((current?.wind_speed_10m ?? 0) * 10) / 10,
-    city: cityName,
+    current: {
+      temp: Math.round(c?.temperature_2m ?? 0),
+      feelsLike: Math.round(c?.apparent_temperature ?? 0),
+      condition: wmo.condition,
+      icon: wmo.icon,
+      humidity: Math.round(c?.relative_humidity_2m ?? 0),
+      windSpeed: Math.round((c?.wind_speed_10m ?? 0) * 10) / 10,
+      city: cityName,
+      date: today,
+    },
+    forecast,
   };
 }
 
@@ -117,7 +152,7 @@ async function fetchExchangeRate(currencyCode: string): Promise<ExchangeData> {
 
 export function WeatherExchangeCard() {
   const { config } = useTripConfig();
-  const [weather, setWeather] = useState<WeatherData | null>(null);
+  const [weatherResult, setWeatherResult] = useState<WeatherResult | null>(null);
   const [exchange, setExchange] = useState<ExchangeData | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -132,7 +167,7 @@ export function WeatherExchangeCard() {
       fetchWeather(coords.lat, coords.lng, coords.name).catch(() => null),
       fetchExchangeRate(currency.code).catch(() => null),
     ]).then(([w, e]) => {
-      setWeather(w);
+      setWeatherResult(w);
       setExchange(e);
       setLoading(false);
     });
@@ -147,62 +182,82 @@ export function WeatherExchangeCard() {
           <CardTitle className="text-base">날씨 &amp; 환율</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 gap-4">
-            <Skeleton className="h-28 rounded-lg" />
-            <Skeleton className="h-28 rounded-lg" />
-          </div>
+          <Skeleton className="h-40 rounded-lg" />
         </CardContent>
       </Card>
     );
   }
 
-  const krwConverted = exchange
-    ? Math.round(exchange.rate * currency.unit)
-    : 0;
+  const weather = weatherResult?.current;
+  const forecast = weatherResult?.forecast ?? [];
+  const krwConverted = exchange ? Math.round(exchange.rate * currency.unit) : 0;
+  const todayDisplay = weather?.date
+    ? `${new Date(weather.date).getMonth() + 1}/${new Date(weather.date).getDate()}`
+    : "";
 
   return (
     <Card>
       <CardHeader className="pb-2">
         <CardTitle className="text-base">날씨 &amp; 환율</CardTitle>
       </CardHeader>
-      <CardContent>
-        <div className="grid grid-cols-2 gap-4">
-          {/* Weather */}
-          <div className="flex flex-col gap-1 p-3 rounded-lg bg-sky-50 dark:bg-sky-950/30">
+      <CardContent className="space-y-3">
+        {/* Current weather */}
+        <div className="p-3 rounded-lg bg-sky-50 dark:bg-sky-950/30">
+          <div className="flex items-center justify-between mb-1">
             <p className="text-xs text-muted-foreground font-medium">
-              {weather?.city ?? coords.name} 날씨
+              {weather?.city ?? coords.name}
             </p>
-            <div className="flex items-center gap-2">
-              <span className="text-3xl">{weather?.icon ?? "🌡"}</span>
-              <div>
-                <p className="text-xl font-bold">{weather?.temp ?? 0}°C</p>
+            <p className="text-xs text-muted-foreground">{todayDisplay} 현재</p>
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="text-3xl">{weather?.icon ?? "🌡"}</span>
+            <div className="flex-1">
+              <div className="flex items-baseline gap-1">
+                <p className="text-2xl font-bold">{weather?.temp ?? 0}°C</p>
                 <p className="text-xs text-muted-foreground">
-                  {weather?.condition ?? "불러오는 중"}
+                  {weather?.condition}
                 </p>
               </div>
+              <p className="text-xs text-muted-foreground">
+                체감 {weather?.feelsLike ?? 0}°C · 습도 {weather?.humidity ?? 0}% · 풍속 {weather?.windSpeed ?? 0}km/h
+              </p>
             </div>
-            <p className="text-xs text-muted-foreground">
-              체감 {weather?.feelsLike ?? 0}°C · 습도 {weather?.humidity ?? 0}%
-            </p>
-            <p className="text-xs text-muted-foreground">
-              풍속 {weather?.windSpeed ?? 0}km/h
-            </p>
           </div>
+        </div>
 
-          {/* Exchange */}
-          <div className="flex flex-col gap-1 p-3 rounded-lg bg-emerald-50 dark:bg-emerald-950/30">
-            <p className="text-xs text-muted-foreground font-medium">
-              실시간 환율
-            </p>
-            <div className="flex flex-col gap-0.5">
-              <p className="text-lg font-bold text-emerald-700 dark:text-emerald-400">
-                {currency.symbol}{currency.unit.toLocaleString()}
+        {/* 3-day forecast */}
+        {forecast.length > 0 && (
+          <div className="grid grid-cols-3 gap-2">
+            {forecast.map((day) => (
+              <div
+                key={day.date}
+                className="flex flex-col items-center gap-0.5 p-2 rounded-lg bg-sky-50/50 dark:bg-sky-950/20 text-center"
+              >
+                <p className="text-[10px] text-muted-foreground">
+                  {day.date} ({day.weekday})
+                </p>
+                <span className="text-lg">{day.icon}</span>
+                <p className="text-xs font-medium">
+                  {day.tempMax}° / {day.tempMin}°
+                </p>
+                <p className="text-[10px] text-muted-foreground">{day.condition}</p>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Exchange rate */}
+        <div className="p-3 rounded-lg bg-emerald-50 dark:bg-emerald-950/30">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs text-muted-foreground font-medium mb-0.5">
+                실시간 환율
               </p>
-              <p className="text-sm font-medium">
-                = ₩{krwConverted.toLocaleString()}
+              <p className="text-sm font-bold text-emerald-700 dark:text-emerald-400">
+                {currency.symbol}{currency.unit.toLocaleString()} = ₩{krwConverted.toLocaleString()}
               </p>
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-[10px] text-muted-foreground">
               {exchange?.updatedAt ?? "-"} 기준
             </p>
           </div>
