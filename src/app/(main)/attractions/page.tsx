@@ -89,14 +89,7 @@ export default function AttractionsPage() {
   const destinations = parseDest(activeTrip?.destinations);
   const effectiveDestinations = destinations.length > 0 ? destinations : [];
 
-  if (tripLoading) {
-    return <div className="px-4 py-6 space-y-3"><div className="h-32 w-full bg-muted rounded-lg animate-pulse" /></div>;
-  }
-
-  if (!activeTrip) {
-    return <NoTripPrompt icon="🏯" />;
-  }
-
+  // All hooks MUST be before any conditional return
   const {
     items: recommendedItems,
     loading: recLoading,
@@ -104,6 +97,7 @@ export default function AttractionsPage() {
   } = useRecommendations({
     cities: effectiveDestinations,
     type: "attraction",
+    enabled: !!activeTrip,
   });
 
   const selectedCities = useMemo(
@@ -153,6 +147,15 @@ export default function AttractionsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [selectedCity, searchQuery, userAttractions]
   );
+
+  // Conditional returns AFTER all hooks
+  if (tripLoading) {
+    return <div className="px-4 py-6 space-y-3"><div className="h-32 w-full bg-muted rounded-lg animate-pulse" /></div>;
+  }
+
+  if (!activeTrip) {
+    return <NoTripPrompt icon="🏯" />;
+  }
 
   function handleSchedule(attraction: SavedAttraction) {
     setSavedAttractionIds((prev) => {

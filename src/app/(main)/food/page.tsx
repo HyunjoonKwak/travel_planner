@@ -251,34 +251,20 @@ export default function FoodPage() {
   const destinations = parseDest(activeTrip?.destinations);
   const effectiveDestinations = destinations.length > 0 ? destinations : [];
 
-  if (tripLoading) {
-    return (
-      <div className="px-4 py-6">
-        <RecommendationSkeleton />
-      </div>
-    );
-  }
-
-  if (!activeTrip) {
-    return <NoTripPrompt icon="🍜" />;
-  }
-
-  // 1) 에디터 추천 (정적 데이터 - 미즈노, 잇치란 등)
+  // All hooks MUST be called before any conditional return
   const curatedSpots = useMemo(
     () => [...getFoodSpotsForCities(effectiveDestinations)],
     [effectiveDestinations],
   );
 
-  // 2) Google 추천 (API 자동 검색)
   const { items: recommendedItems, loading: recLoading, refresh: recRefresh } =
-    useRecommendations({ cities: effectiveDestinations, type: "food" });
+    useRecommendations({ cities: effectiveDestinations, type: "food", enabled: !!activeTrip });
 
   const googleSpots = useMemo(
     () => recommendedItems.map(recommendationToFoodSpot),
     [recommendedItems],
   );
 
-  // 3) 도시 목록
   const selectedCities = useMemo(
     () => effectiveDestinations.map((id) => getCityById(id)).filter((c): c is NonNullable<typeof c> => !!c),
     [effectiveDestinations],
@@ -323,6 +309,18 @@ export default function FoodPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [selectedCity, selectedCategory, searchQuery, userSpots],
   );
+
+  if (tripLoading) {
+    return (
+      <div className="px-4 py-6">
+        <RecommendationSkeleton />
+      </div>
+    );
+  }
+
+  if (!activeTrip) {
+    return <NoTripPrompt icon="🍜" />;
+  }
 
   function handleDeleteUserSpot(id: string) {
     setUserSpots((prev) => prev.filter((s) => s.id !== id));
