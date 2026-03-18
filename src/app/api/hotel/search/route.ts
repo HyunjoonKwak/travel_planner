@@ -24,6 +24,8 @@ const MOCK_HOTELS: ReadonlyArray<HotelSearchResult> = [
   { placeId: "h_intercontinental", name: "인터컨티넨탈 오사카", nameJa: "インターコンチネンタルホテル大阪", address: "大阪市北区大深町3-60", rating: 4.6, reviewCount: 3890, phone: "06-6374-5700", city: "오사카" },
   { placeId: "h_marriott_osaka", name: "오사카 매리어트 미야코 호텔", nameJa: "大阪マリオット都ホテル", address: "大阪市阿倍野区阿倍野筋1-1-43", rating: 4.6, reviewCount: 2987, phone: "06-6628-6111", city: "오사카" },
   { placeId: "h_rihga_osaka", name: "리가로열호텔 오사카", nameJa: "リーガロイヤルホテル大阪", address: "大阪市北区中之島5-3-68", rating: 4.3, reviewCount: 3456, phone: "06-6448-1121", city: "오사카" },
+  { placeId: "h_onyado_nono_namba", name: "온야도 노노 난바 내추럴 핫 스프링", nameJa: "御宿野乃 なんば", address: "大阪市中央区島之内1-21-31", rating: 4.5, reviewCount: 2654, phone: "06-6556-4126", city: "오사카" },
+  { placeId: "h_onyado_nono_osaka", name: "온야도 노노 오사카 요도야바시", nameJa: "御宿野乃 大阪淀屋橋", address: "大阪市中央区高麗橋3-2-8", rating: 4.4, reviewCount: 1876, phone: "06-6222-5489", city: "오사카" },
   // Kyoto
   { placeId: "h_granvia_kyoto", name: "호텔 그란비아 교토", nameJa: "ホテルグランヴィア京都", address: "京都市下京区烏丸通塩小路下ル", rating: 4.4, reviewCount: 4567, phone: "075-344-8888", city: "교토" },
   { placeId: "h_mitsui_kyoto", name: "미쓰이 가든 호텔 교토역전", nameJa: "三井ガーデンホテル京都駅前", address: "京都市下京区東塩小路町846-3", rating: 4.2, reviewCount: 2341, phone: "075-361-5531", city: "교토" },
