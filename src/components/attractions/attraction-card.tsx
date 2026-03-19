@@ -109,10 +109,9 @@ export function AttractionCard({
             size="sm"
             className="flex-1 h-7 text-xs gap-1"
             onClick={() => onSchedule(attraction)}
-            disabled={scheduled}
           >
             <CalendarPlus className="h-3 w-3" />
-            {scheduled ? "저장됨" : "일정에 추가"}
+            {scheduled ? "날짜 선택" : "일정에 추가"}
           </Button>
         </div>
       </CardContent>

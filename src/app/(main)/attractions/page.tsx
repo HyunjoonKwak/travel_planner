@@ -13,14 +13,18 @@ import {
   type SavedAttraction,
 } from "@/components/attractions/attraction-card";
 import { AttractionSearchDrawer } from "@/components/attractions/attraction-search-drawer";
+import { ScheduleDatePickerDrawer } from "@/components/common/schedule-date-picker-drawer";
 import { getCityById } from "@/lib/data/destinations";
 import { normalizeKo, parseDestinations } from "@/lib/utils/trip-helpers";
+import { generateTripDates, formatDateKo } from "@/lib/utils/date";
 import { useActiveTrip } from "@/hooks/use-trip";
 import { useRecommendations } from "@/hooks/use-recommendations";
-import { useTripAttractions } from "@/hooks/use-trip-data";
+import { useTripAttractions, useTripSchedules } from "@/hooks/use-trip-data";
 import type { RecommendationResult } from "@/types/recommendation";
 import type { GooglePlaceResult } from "@/types/food-search";
 import { NoTripPrompt } from "@/components/common/no-trip-prompt";
+import type { ScheduleCategory } from "@/types/schedule";
+import { toast } from "sonner";
 
 function recommendationToAttraction(
   item: RecommendationResult
@@ -86,6 +90,7 @@ export default function AttractionsPage() {
   const [selectedCity, setSelectedCity] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [addDrawerOpen, setAddDrawerOpen] = useState(false);
+  const [pendingAttraction, setPendingAttraction] = useState<SavedAttraction | null>(null);
 
   const tripId = activeTrip?.id ?? "";
   const {
@@ -93,6 +98,12 @@ export default function AttractionsPage() {
     loading: attractionsLoading,
     create: saveAttraction,
   } = useTripAttractions(tripId);
+  const { create: createSchedule } = useTripSchedules(tripId);
+
+  const tripDates = useMemo(
+    () => generateTripDates(activeTrip?.startDate ?? "", activeTrip?.endDate ?? ""),
+    [activeTrip?.startDate, activeTrip?.endDate],
+  );
 
   const destinations = parseDestinations(activeTrip?.destinations);
   const effectiveDestinations = useMemo(
@@ -191,8 +202,28 @@ export default function AttractionsPage() {
   }
 
   function handleSchedule(attraction: SavedAttraction) {
-    if (savedPlaceIds.has(attraction.placeId)) return;
-    saveAttraction(attractionToPayload(attraction));
+    if (!savedPlaceIds.has(attraction.placeId)) {
+      saveAttraction(attractionToPayload(attraction));
+    }
+    setPendingAttraction(attraction);
+  }
+
+  function handleDateConfirm(date: string) {
+    if (!pendingAttraction) return;
+    const name = pendingAttraction.name;
+    createSchedule({
+      date,
+      startTime: "10:00",
+      endTime: "12:00",
+      title: name,
+      titleJa: pendingAttraction.nameJa,
+      location: name,
+      category: "sightseeing" satisfies ScheduleCategory,
+      mapUrl: pendingAttraction.googleMapsUrl ?? null,
+      memo: pendingAttraction.address,
+    });
+    setPendingAttraction(null);
+    toast.success(`${name} 일정이 ${formatDateKo(date)}에 추가되었습니다`);
   }
 
   function handleAddPlace(place: GooglePlaceResult) {
@@ -379,6 +410,15 @@ export default function AttractionsPage() {
         onOpenChange={setAddDrawerOpen}
         addedPlaceIds={addedPlaceIds}
         onAdd={handleAddPlace}
+      />
+
+      <ScheduleDatePickerDrawer
+        open={pendingAttraction !== null}
+        onOpenChange={(open) => { if (!open) setPendingAttraction(null); }}
+        tripDates={tripDates}
+        itemTitle={pendingAttraction?.name ?? ""}
+        itemTitleJa={pendingAttraction?.nameJa}
+        onConfirm={handleDateConfirm}
       />
     </div>
   );

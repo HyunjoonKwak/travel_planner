@@ -11,7 +11,7 @@ import {
   DrawerTitle,
 } from "@/components/ui/drawer";
 import { Skeleton } from "@/components/ui/skeleton";
-import { formatDateKo } from "@/lib/utils/date";
+import { formatDateKo, generateTripDates } from "@/lib/utils/date";
 import { ScheduleList } from "@/components/schedule/schedule-list";
 import { ScheduleForm } from "@/components/schedule/schedule-form";
 import { ScheduleMap } from "@/components/schedule/schedule-map";
@@ -23,18 +23,6 @@ import { AIScheduleDrawer } from "@/components/schedule/ai-schedule-drawer";
 import type { ScheduleItem } from "@/types/schedule";
 import type { FlightInfo, HotelInfo } from "@/hooks/use-trip-config";
 import { NoTripPrompt } from "@/components/common/no-trip-prompt";
-
-function generateTripDates(start: string, end: string): string[] {
-  if (!start || !end) return [];
-  const dates: string[] = [];
-  const current = new Date(start);
-  const last = new Date(end);
-  while (current <= last) {
-    dates.push(current.toISOString().slice(0, 10));
-    current.setDate(current.getDate() + 1);
-  }
-  return dates;
-}
 
 function getUniquePlaces(items: ScheduleItem[]) {
   const seen = new Set<string>();

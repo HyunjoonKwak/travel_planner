@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { MapPin, Clock, X, Volume2, Star, Trophy, ExternalLink } from "lucide-react";
+import { MapPin, Clock, X, Volume2, Star, Trophy, ExternalLink, CalendarPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -15,6 +15,7 @@ import { FOOD_CATEGORY_CONFIG } from "@/types/food";
 interface FoodDetailProps {
   spot: FoodSpot;
   onClose: () => void;
+  onAddToSchedule?: (spot: FoodSpot) => void;
 }
 
 function StarSelector({
@@ -42,7 +43,7 @@ function StarSelector({
   );
 }
 
-export function FoodDetail({ spot, onClose }: FoodDetailProps) {
+export function FoodDetail({ spot, onClose, onAddToSchedule }: FoodDetailProps) {
   const { speak } = useSpeech();
   const [myRating, setMyRating] = useState(spot.myRating ?? 0);
   const [myReview, setMyReview] = useState(spot.myReview ?? "");
@@ -97,16 +98,29 @@ export function FoodDetail({ spot, onClose }: FoodDetailProps) {
         </div>
       </div>
 
-      <a
-        href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(spot.addressJa || spot.address)} ${encodeURIComponent(spot.nameJa)}`}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="flex items-center gap-2 rounded-lg border border-green-200 dark:border-green-900 bg-green-50 dark:bg-green-950/30 px-3 py-2.5 text-sm text-green-700 dark:text-green-300 hover:bg-green-100 dark:hover:bg-green-950/50 transition-colors"
-      >
-        <MapPin className="h-4 w-4 shrink-0" />
-        <span className="flex-1 font-medium">Google 지도에서 보기</span>
-        <ExternalLink className="h-3.5 w-3.5 shrink-0" />
-      </a>
+      <div className="flex gap-2">
+        <a
+          href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(spot.addressJa || spot.address)} ${encodeURIComponent(spot.nameJa)}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex-1 flex items-center gap-2 rounded-lg border border-green-200 dark:border-green-900 bg-green-50 dark:bg-green-950/30 px-3 py-2.5 text-sm text-green-700 dark:text-green-300 hover:bg-green-100 dark:hover:bg-green-950/50 transition-colors"
+        >
+          <MapPin className="h-4 w-4 shrink-0" />
+          <span className="flex-1 font-medium">지도 보기</span>
+          <ExternalLink className="h-3.5 w-3.5 shrink-0" />
+        </a>
+        {onAddToSchedule && (
+          <Button
+            variant="default"
+            size="sm"
+            className="h-auto gap-1.5 px-3"
+            onClick={() => onAddToSchedule(spot)}
+          >
+            <CalendarPlus className="h-4 w-4" />
+            일정에 추가
+          </Button>
+        )}
+      </div>
 
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1.5">

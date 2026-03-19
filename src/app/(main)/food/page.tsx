@@ -20,14 +20,18 @@ import { FoodSearchDrawer } from "@/components/food/food-search-drawer";
 import { getFoodSpotsForCities } from "@/lib/data/food-registry";
 import { getCityById } from "@/lib/data/destinations";
 import { normalizeKo, parseDestinations } from "@/lib/utils/trip-helpers";
+import { ScheduleDatePickerDrawer } from "@/components/common/schedule-date-picker-drawer";
 import { useActiveTrip } from "@/hooks/use-trip";
 import { useRecommendations } from "@/hooks/use-recommendations";
-import { useTripFoodSpots } from "@/hooks/use-trip-data";
+import { useTripFoodSpots, useTripSchedules } from "@/hooks/use-trip-data";
+import { generateTripDates, formatDateKo } from "@/lib/utils/date";
 import type { FoodCategory, FoodSpot } from "@/types/food";
 import { FOOD_CATEGORY_CONFIG } from "@/types/food";
 import type { GooglePlaceResult } from "@/types/food-search";
 import type { RecommendationResult } from "@/types/recommendation";
 import { NoTripPrompt } from "@/components/common/no-trip-prompt";
+import type { ScheduleCategory } from "@/types/schedule";
+import { toast } from "sonner";
 
 type FilterCategory = "all" | FoodCategory;
 
@@ -237,6 +241,7 @@ export default function FoodPage() {
   const [selectedSpot, setSelectedSpot] = useState<FoodSpot | null>(null);
   const [detailDrawerOpen, setDetailDrawerOpen] = useState(false);
   const [addDrawerOpen, setAddDrawerOpen] = useState(false);
+  const [pendingFoodSpot, setPendingFoodSpot] = useState<FoodSpot | null>(null);
 
   const tripId = activeTrip?.id ?? "";
   const {
@@ -245,6 +250,12 @@ export default function FoodPage() {
     create: createSpot,
     remove: removeSpot,
   } = useTripFoodSpots(tripId);
+  const { create: createSchedule } = useTripSchedules(tripId);
+
+  const tripDates = useMemo(
+    () => generateTripDates(activeTrip?.startDate ?? "", activeTrip?.endDate ?? ""),
+    [activeTrip?.startDate, activeTrip?.endDate],
+  );
 
   const destinations = parseDestinations(activeTrip?.destinations);
   const effectiveDestinations = useMemo(
@@ -384,6 +395,29 @@ export default function FoodPage() {
     setDetailDrawerOpen(true);
   }
 
+  function handleAddToSchedule(spot: FoodSpot) {
+    setDetailDrawerOpen(false);
+    setPendingFoodSpot(spot);
+  }
+
+  function handleDateConfirm(date: string) {
+    if (!pendingFoodSpot) return;
+    const name = pendingFoodSpot.name;
+    createSchedule({
+      date,
+      startTime: "12:00",
+      endTime: "13:30",
+      title: name,
+      titleJa: pendingFoodSpot.nameJa,
+      location: name,
+      category: "food" satisfies ScheduleCategory,
+      mapUrl: pendingFoodSpot.mapUrl ?? null,
+      memo: pendingFoodSpot.address,
+    });
+    setPendingFoodSpot(null);
+    toast.success(`${name} 일정이 ${formatDateKo(date)}에 추가되었습니다`);
+  }
+
   const cityLabel = selectedCities.map((c) => c.name).join(" · ");
   const totalCount = filteredCurated.length + filteredGoogle.length + filteredUser.length;
 
@@ -507,7 +541,7 @@ export default function FoodPage() {
             <DrawerTitle>{selectedSpot?.name ?? "맛집 상세"}</DrawerTitle>
           </DrawerHeader>
           <div className="px-4 pb-8 overflow-y-auto max-h-[80vh]">
-            {selectedSpot && <FoodDetail spot={selectedSpot} onClose={() => { setDetailDrawerOpen(false); setSelectedSpot(null); }} />}
+            {selectedSpot && <FoodDetail spot={selectedSpot} onClose={() => { setDetailDrawerOpen(false); setSelectedSpot(null); }} onAddToSchedule={handleAddToSchedule} />}
           </div>
         </DrawerContent>
       </Drawer>
@@ -517,6 +551,15 @@ export default function FoodPage() {
         onOpenChange={setAddDrawerOpen}
         addedPlaceIds={addedPlaceIds}
         onAdd={handleAddPlace}
+      />
+
+      <ScheduleDatePickerDrawer
+        open={pendingFoodSpot !== null}
+        onOpenChange={(open) => { if (!open) setPendingFoodSpot(null); }}
+        tripDates={tripDates}
+        itemTitle={pendingFoodSpot?.name ?? ""}
+        itemTitleJa={pendingFoodSpot?.nameJa}
+        onConfirm={handleDateConfirm}
       />
     </div>
   );

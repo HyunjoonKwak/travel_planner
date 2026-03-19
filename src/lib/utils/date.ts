@@ -1,4 +1,4 @@
-import { format, differenceInDays, parseISO } from "date-fns";
+import { format, differenceInDays, eachDayOfInterval, parseISO } from "date-fns";
 import { ko } from "date-fns/locale";
 
 export function getDday(targetDate: string): number {
@@ -23,4 +23,11 @@ export function getWeekday(date: string): string {
 
 export function generateId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+}
+
+export function generateTripDates(start: string, end: string): string[] {
+  if (!start || !end) return [];
+  return eachDayOfInterval({ start: parseISO(start), end: parseISO(end) }).map(
+    (d) => format(d, "yyyy-MM-dd"),
+  );
 }
