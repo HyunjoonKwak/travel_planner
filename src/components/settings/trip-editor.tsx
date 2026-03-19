@@ -15,7 +15,12 @@ import { DestinationSelector } from "@/components/settings/destination-selector"
 import { ThemeSelector } from "@/components/settings/theme-selector";
 import { FlightSection } from "@/components/settings/flight-section";
 import { getCityById } from "@/lib/data/destinations";
-import { jpyToKrw, krwToJpy } from "@/lib/utils/currency";
+import {
+  getCurrencyForCountry,
+  convertToKRW,
+  convertFromKRW,
+  formatCurrency,
+} from "@/lib/utils/currency";
 
 export interface TripFormData {
   name: string;
@@ -66,7 +71,7 @@ export function TripEditor({ trip, onSave, onCancel }: TripEditorProps) {
   const savedBudget = safeJsonParse<BudgetConfig>(trip?.budget);
 
   // Basic info
-  const [country, setCountry] = useState(trip?.country ?? "japan");
+  const [country, setCountry] = useState(trip?.country ?? "JP");
   const [destinations, setDestinations] = useState<ReadonlyArray<string>>(
     safeJsonParse<string[]>(trip?.destinations) ?? [],
   );
@@ -95,9 +100,10 @@ export function TripEditor({ trip, onSave, onCancel }: TripEditorProps) {
   const [isSearching, setIsSearching] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
 
-  // Budget
-  const [inputCurrency, setInputCurrency] = useState<"JPY" | "KRW">("JPY");
-  const [totalJpy, setTotalJpy] = useState(savedBudget?.totalBudget ?? 0);
+  // Budget - stored in local currency (derived from country)
+  const localCurrency = getCurrencyForCountry(country);
+  const [inputIsLocal, setInputIsLocal] = useState(true);
+  const [totalLocal, setTotalLocal] = useState(savedBudget?.totalBudget ?? 0);
   const [totalInput, setTotalInput] = useState(String(savedBudget?.totalBudget ?? ""));
   const [categories, setCategories] = useState<Categories>(
     savedBudget?.categories ?? { food: 0, transport: 0, shopping: 0, accommodation: 0, sightseeing: 0, other: 0 },
@@ -136,34 +142,45 @@ export function TripEditor({ trip, onSave, onCancel }: TripEditorProps) {
     toast.success(`${r.name} 자동 입력됨`);
   }
 
-  const inputSymbol = inputCurrency === "JPY" ? "¥" : "₩";
-  const convertedSymbol = inputCurrency === "JPY" ? "₩" : "¥";
-  const displayTotal = inputCurrency === "JPY" ? totalJpy : jpyToKrw(totalJpy);
-  const convertedTotal = inputCurrency === "JPY" ? jpyToKrw(totalJpy) : totalJpy;
+  const inputSymbol = inputIsLocal ? localCurrency.symbol : "₩";
+  const convertedSymbol = inputIsLocal ? "₩" : localCurrency.symbol;
+  const displayTotal = inputIsLocal ? totalLocal : convertToKRW(totalLocal, localCurrency.code);
+  const convertedTotal = inputIsLocal ? convertToKRW(totalLocal, localCurrency.code) : totalLocal;
   const allocated = Object.values(categories).reduce((a, b) => a + b, 0);
-  const unallocatedJpy = totalJpy - allocated;
-  const unallocatedDisplay = inputCurrency === "JPY" ? unallocatedJpy : jpyToKrw(unallocatedJpy);
+  const unallocatedLocal = totalLocal - allocated;
+  const unallocatedDisplay = inputIsLocal ? unallocatedLocal : convertToKRW(unallocatedLocal, localCurrency.code);
 
   function handleTotalChange(rawValue: string) {
     setTotalInput(rawValue);
     const num = Number(rawValue) || 0;
-    const jpyVal = inputCurrency === "JPY" ? num : krwToJpy(num);
-    setTotalJpy(jpyVal);
-    if (jpyVal > 0) {
+    const localVal = inputIsLocal ? num : convertFromKRW(num, localCurrency.code);
+    setTotalLocal(localVal);
+    if (localVal > 0) {
       setCategories({
-        food: Math.round(jpyVal * DEFAULT_RATIOS.food),
-        transport: Math.round(jpyVal * DEFAULT_RATIOS.transport),
-        shopping: Math.round(jpyVal * DEFAULT_RATIOS.shopping),
-        accommodation: Math.round(jpyVal * DEFAULT_RATIOS.accommodation),
-        sightseeing: Math.round(jpyVal * DEFAULT_RATIOS.sightseeing),
-        other: Math.round(jpyVal * DEFAULT_RATIOS.other),
+        food: Math.round(localVal * DEFAULT_RATIOS.food),
+        transport: Math.round(localVal * DEFAULT_RATIOS.transport),
+        shopping: Math.round(localVal * DEFAULT_RATIOS.shopping),
+        accommodation: Math.round(localVal * DEFAULT_RATIOS.accommodation),
+        sightseeing: Math.round(localVal * DEFAULT_RATIOS.sightseeing),
+        other: Math.round(localVal * DEFAULT_RATIOS.other),
       });
     }
   }
 
   function handleCategoryChange(key: keyof Categories, val: number) {
-    const jpyVal = inputCurrency === "JPY" ? val : krwToJpy(val);
-    setCategories((prev) => ({ ...prev, [key]: jpyVal }));
+    const localVal = inputIsLocal ? val : convertFromKRW(val, localCurrency.code);
+    setCategories((prev) => ({ ...prev, [key]: localVal }));
+  }
+
+  function handleCurrencyToggle() {
+    setInputIsLocal((prev) => {
+      const next = !prev;
+      const converted = next
+        ? convertFromKRW(displayTotal, localCurrency.code)
+        : convertToKRW(totalLocal, localCurrency.code);
+      setTotalInput(converted ? String(converted) : "");
+      return next;
+    });
   }
 
   async function handleSave() {
@@ -173,7 +190,7 @@ export function TripEditor({ trip, onSave, onCancel }: TripEditorProps) {
       const hotel: HotelInfo | undefined = hotelName
         ? { name: hotelName, ...(hotelNameJa ? { nameJa: hotelNameJa } : {}), address: hotelAddress, checkIn, checkOut, ...(hotelCode ? { confirmationCode: hotelCode } : {}), ...(hotelPhone ? { phone: hotelPhone } : {}) }
         : undefined;
-      const budget: BudgetConfig | undefined = totalJpy > 0 ? { totalBudget: totalJpy, categories } : undefined;
+      const budget: BudgetConfig | undefined = totalLocal > 0 ? { totalBudget: totalLocal, categories } : undefined;
 
       await onSave({ name, country, destinations: [...destinations], theme, startDate, endDate, outboundFlight, returnFlight, hotel, budget });
     } finally {
@@ -182,6 +199,9 @@ export function TripEditor({ trip, onSave, onCancel }: TripEditorProps) {
   }
 
   const preview = buildName([...destinations], theme);
+  const currencyToggleLabel = inputIsLocal
+    ? `${localCurrency.name} (${localCurrency.code})`
+    : `원화 (KRW)`;
 
   return (
     <div className="space-y-4">
@@ -251,9 +271,9 @@ export function TripEditor({ trip, onSave, onCancel }: TripEditorProps) {
           <div className="border-t pt-3 space-y-3">
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5"><Label htmlFor="h-name">호텔명</Label><Input id="h-name" placeholder="도톤보리 호텔" value={hotelName} onChange={(e) => setHotelName(e.target.value)} /></div>
-              <div className="space-y-1.5"><Label htmlFor="h-name-ja">일본어 이름 (선택)</Label><Input id="h-name-ja" placeholder="ドーミーイン" value={hotelNameJa} onChange={(e) => setHotelNameJa(e.target.value)} /></div>
+              <div className="space-y-1.5"><Label htmlFor="h-name-ja">현지 이름 (선택)</Label><Input id="h-name-ja" placeholder="ドーミーイン" value={hotelNameJa} onChange={(e) => setHotelNameJa(e.target.value)} /></div>
             </div>
-            <div className="space-y-1.5"><Label htmlFor="h-address">주소</Label><Input id="h-address" placeholder="大阪市中央区..." value={hotelAddress} onChange={(e) => setHotelAddress(e.target.value)} /></div>
+            <div className="space-y-1.5"><Label htmlFor="h-address">주소</Label><Input id="h-address" placeholder="현지 주소" value={hotelAddress} onChange={(e) => setHotelAddress(e.target.value)} /></div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5"><Label htmlFor="h-checkin">체크인</Label><Input id="h-checkin" type="date" value={checkIn} onChange={(e) => setCheckIn(e.target.value)} /></div>
               <div className="space-y-1.5"><Label htmlFor="h-checkout">체크아웃</Label><Input id="h-checkout" type="date" value={checkOut} onChange={(e) => setCheckOut(e.target.value)} /></div>
@@ -269,33 +289,28 @@ export function TripEditor({ trip, onSave, onCancel }: TripEditorProps) {
           <div className="space-y-1.5">
             <div className="flex items-center justify-between">
               <Label htmlFor="budget-total">총 예산</Label>
-              <button type="button" onClick={() => {
-                setInputCurrency((p) => {
-                  const next = p === "JPY" ? "KRW" : "JPY";
-                  const converted = next === "JPY" ? totalJpy : jpyToKrw(totalJpy);
-                  setTotalInput(converted ? String(converted) : "");
-                  return next;
-                });
-              }} className="flex items-center gap-1.5 text-xs font-medium text-green-600 hover:text-green-700 rounded-full border border-green-300 px-2.5 py-1">
+              <button type="button" onClick={handleCurrencyToggle} className="flex items-center gap-1.5 text-xs font-medium text-green-600 hover:text-green-700 rounded-full border border-green-300 px-2.5 py-1">
                 <ArrowRightLeft className="h-3 w-3" />
-                {inputCurrency === "JPY" ? "엔화 (JPY)" : "원화 (KRW)"}
+                {currencyToggleLabel}
               </button>
             </div>
             <div className="relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-medium">{inputSymbol}</span>
-              <Input id="budget-total" type="number" placeholder={inputCurrency === "JPY" ? "300000" : "2670000"} value={totalInput} onChange={(e) => handleTotalChange(e.target.value)} className="pl-7" />
+              <Input id="budget-total" type="number" placeholder={inputIsLocal ? "300000" : "2820000"} value={totalInput} onChange={(e) => handleTotalChange(e.target.value)} className="pl-7" />
             </div>
-            {totalJpy > 0 && (
-              <p className="text-xs text-muted-foreground">≈ {convertedSymbol}{convertedTotal.toLocaleString()}<span className="ml-2 text-muted-foreground/60">(1¥ ≈ ₩8.9)</span></p>
+            {totalLocal > 0 && (
+              <p className="text-xs text-muted-foreground">
+                ≈ {convertedSymbol}{convertedTotal.toLocaleString()}
+              </p>
             )}
           </div>
-          {totalJpy > 0 && (
+          {totalLocal > 0 && (
             <div className="space-y-3">
               <p className="text-xs font-medium text-muted-foreground">카테고리별 예산 ({inputSymbol})</p>
               {CATEGORY_META.map(({ key, label, icon }) => {
-                const jpyVal = categories[key];
-                const displayVal = inputCurrency === "JPY" ? jpyVal : jpyToKrw(jpyVal);
-                const percent = totalJpy > 0 ? Math.min((jpyVal / totalJpy) * 100, 100) : 0;
+                const localVal = categories[key];
+                const displayVal = inputIsLocal ? localVal : convertToKRW(localVal, localCurrency.code);
+                const percent = totalLocal > 0 ? Math.min((localVal / totalLocal) * 100, 100) : 0;
                 return (
                   <div key={key} className="space-y-1">
                     <div className="flex items-center justify-between">
@@ -311,7 +326,10 @@ export function TripEditor({ trip, onSave, onCancel }: TripEditorProps) {
               })}
               <div className="rounded-lg bg-muted/50 p-3 flex items-center justify-between">
                 <span className="text-xs text-muted-foreground">미배분</span>
-                <span className={unallocatedJpy < 0 ? "text-xs font-semibold text-destructive" : "text-xs font-semibold text-green-600"}>{inputSymbol}{unallocatedDisplay.toLocaleString()}</span>
+                <span className={unallocatedLocal < 0 ? "text-xs font-semibold text-destructive" : "text-xs font-semibold text-green-600"}>
+                  {formatCurrency(Math.abs(unallocatedDisplay), inputIsLocal ? localCurrency.code : "KRW")}
+                  {unallocatedLocal < 0 ? " 초과" : ""}
+                </span>
               </div>
             </div>
           )}

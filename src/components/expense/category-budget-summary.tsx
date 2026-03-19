@@ -2,7 +2,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import { formatJPY } from "@/lib/utils/currency";
+import { formatCurrency, convertCurrency } from "@/lib/utils/currency";
 import type { Expense, ExpenseCategory } from "@/types/expense";
 import { EXPENSE_CATEGORY_CONFIG } from "@/types/expense";
 import type { BudgetConfig } from "@/hooks/use-trip-config";
@@ -10,11 +10,18 @@ import type { BudgetConfig } from "@/hooks/use-trip-config";
 interface CategoryBudgetSummaryProps {
   expenses: Expense[];
   budget: BudgetConfig;
+  localCode: string;
+}
+
+function toLocal(expense: Expense, localCode: string): number {
+  if (expense.currency === localCode) return expense.amount;
+  return convertCurrency(expense.amount, expense.currency, localCode);
 }
 
 export function CategoryBudgetSummary({
   expenses,
   budget,
+  localCode,
 }: CategoryBudgetSummaryProps) {
   return (
     <Card className="mx-4 mb-4">
@@ -31,8 +38,8 @@ export function CategoryBudgetSummary({
           ][]
         ).map(([key, meta]) => {
           const spent = expenses
-            .filter((e) => e.currency === "JPY" && e.category === key)
-            .reduce((s, e) => s + e.amount, 0);
+            .filter((e) => e.category === key)
+            .reduce((s, e) => s + toLocal(e, localCode), 0);
           const budgeted = budget.categories[key];
           return (
             <div
@@ -49,7 +56,7 @@ export function CategoryBudgetSummary({
                     : "text-muted-foreground",
                 )}
               >
-                {formatJPY(spent)} / {formatJPY(budgeted)}
+                {formatCurrency(spent, localCode)} / {formatCurrency(budgeted, localCode)}
               </span>
             </div>
           );

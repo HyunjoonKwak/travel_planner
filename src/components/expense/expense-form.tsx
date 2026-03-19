@@ -29,8 +29,6 @@ import { useActiveTrip } from "@/hooks/use-trip";
 import type { Expense, ExpenseCategory } from "@/types/expense";
 import { EXPENSE_CATEGORY_CONFIG } from "@/types/expense";
 
-const DEFAULT_RATE = 8.9;
-
 const expenseSchema = z.object({
   amount: z
     .number({ message: "금액을 입력하세요" })
@@ -66,11 +64,8 @@ const CATEGORY_OPTIONS = Object.entries(EXPENSE_CATEGORY_CONFIG) as [
   (typeof EXPENSE_CATEGORY_CONFIG)[ExpenseCategory],
 ][];
 
-const TODAY = new Date().toISOString().slice(0, 10);
-
 function parseCountryCode(country: string | null | undefined): string {
   if (!country) return "JP";
-  // country may be stored as country code like "JP", "TH", etc.
   return country.trim().toUpperCase().slice(0, 2);
 }
 
@@ -78,7 +73,9 @@ export function ExpenseForm({ onSubmit, onCancel }: ExpenseFormProps) {
   const { activeTrip } = useActiveTrip();
   const countryCode = parseCountryCode(activeTrip?.country);
   const localCurrency = getCurrencyForCountry(countryCode);
-  const krwCurrency = getCurrencyInfo("KRW");
+
+  // TODAY must be computed inside component to avoid stale module-level value
+  const today = new Date().toISOString().slice(0, 10);
 
   const [currencyCode, setCurrencyCode] = useState<string>(localCurrency.code);
 
@@ -94,7 +91,7 @@ export function ExpenseForm({ onSubmit, onCancel }: ExpenseFormProps) {
       amount: undefined,
       category: "food",
       description: "",
-      date: TODAY,
+      date: today,
       memo: "",
     },
   });
@@ -107,8 +104,8 @@ export function ExpenseForm({ onSubmit, onCancel }: ExpenseFormProps) {
   const convertedAmount =
     amountValue > 0
       ? isLocalCurrency
-        ? convertToKRW(amountValue, currencyCode, DEFAULT_RATE)
-        : convertFromKRW(amountValue, localCurrency.code, DEFAULT_RATE)
+        ? convertToKRW(amountValue, currencyCode)
+        : convertFromKRW(amountValue, localCurrency.code)
       : 0;
 
   const convertedLabel =
@@ -121,8 +118,8 @@ export function ExpenseForm({ onSubmit, onCancel }: ExpenseFormProps) {
   function toggleCurrency() {
     if (amountValue > 0) {
       const converted = isLocalCurrency
-        ? convertToKRW(amountValue, currencyCode, DEFAULT_RATE)
-        : convertFromKRW(amountValue, localCurrency.code, DEFAULT_RATE);
+        ? convertToKRW(amountValue, currencyCode)
+        : convertFromKRW(amountValue, localCurrency.code);
       setValue("amount", converted, { shouldValidate: true });
     }
     setCurrencyCode((prev) => (prev === "KRW" ? localCurrency.code : "KRW"));

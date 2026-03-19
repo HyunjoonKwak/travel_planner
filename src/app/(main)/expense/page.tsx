@@ -1,197 +1,46 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { Plus, PiggyBank } from "lucide-react";
+import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import {
   Drawer,
   DrawerContent,
   DrawerHeader,
   DrawerTitle,
 } from "@/components/ui/drawer";
-import { cn } from "@/lib/utils";
-import {
-  formatCurrency,
-  convertToKRW,
-  getCurrencyForCountry,
-  getCurrencyInfo,
-} from "@/lib/utils/currency";
-import { formatDateKo } from "@/lib/utils/date";
+import { toast } from "sonner";
+import { getCurrencyForCountry } from "@/lib/utils/currency";
 import { useActiveTrip } from "@/hooks/use-trip";
 import { useTripExpenses } from "@/hooks/use-trip-data";
 import { ExpenseForm } from "@/components/expense/expense-form";
 import { ExpenseList } from "@/components/expense/expense-list";
 import { CategoryBudgetSummary } from "@/components/expense/category-budget-summary";
+import {
+  BudgetBar,
+  NoBudgetPrompt,
+  DailySummaryItem,
+  CategorySummaryItem,
+  toLocalAmount,
+} from "@/components/expense/expense-summary-items";
 import type { Expense, ExpenseCategory } from "@/types/expense";
-import { EXPENSE_CATEGORY_CONFIG } from "@/types/expense";
 import type { BudgetConfig } from "@/hooks/use-trip-config";
-import Link from "next/link";
 import { NoTripPrompt } from "@/components/common/no-trip-prompt";
-
-const DEFAULT_RATE = 8.9;
 
 function parseCountryCode(country: string | null | undefined): string {
   if (!country) return "JP";
   return country.trim().toUpperCase().slice(0, 2);
-}
-
-function toKRW(expense: Expense): number {
-  if (expense.currency === "KRW") return expense.amount;
-  return convertToKRW(expense.amount, expense.currency, DEFAULT_RATE);
-}
-
-interface BudgetBarProps {
-  spent: number;
-  budget: number;
-  localCode: string;
-}
-
-function BudgetBar({ spent, budget, localCode }: BudgetBarProps) {
-  const percent = Math.min((spent / budget) * 100, 100);
-  const remaining = budget - spent;
-  const isOver = spent > budget;
-
-  return (
-    <div className="bg-card border rounded-xl p-4 mx-4 my-3">
-      <div className="flex items-center justify-between mb-2">
-        <span className="text-sm font-medium">총 예산</span>
-        <span className="text-sm font-bold">
-          {formatCurrency(budget, localCode)}
-        </span>
-      </div>
-      <Progress
-        value={percent}
-        className={cn("h-3 mb-2", isOver && "[&>div]:bg-destructive")}
-      />
-      <div className="flex items-center justify-between text-xs">
-        <div>
-          <span className="text-muted-foreground">사용: </span>
-          <span className="font-semibold">{formatCurrency(spent, localCode)}</span>
-        </div>
-        <div>
-          <span className="text-muted-foreground">
-            {isOver ? "초과: " : "잔액: "}
-          </span>
-          <span
-            className={cn(
-              "font-semibold",
-              isOver ? "text-destructive" : "text-green-600",
-            )}
-          >
-            {formatCurrency(Math.abs(remaining), localCode)}
-          </span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function NoBudgetPrompt() {
-  return (
-    <div className="mx-4 my-3">
-      <Card className="border-dashed border-amber-300 bg-amber-50 dark:bg-amber-950/20">
-        <CardContent className="flex items-center gap-3 py-4">
-          <PiggyBank className="h-8 w-8 text-amber-500 shrink-0" />
-          <div className="flex-1">
-            <p className="text-sm font-medium">예산이 설정되지 않았습니다</p>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              설정에서 예산을 입력하면 지출 현황을 한눈에 볼 수 있어요
-            </p>
-          </div>
-          <Link href="/settings">
-            <Button size="sm" variant="outline" className="shrink-0">
-              설정하기
-            </Button>
-          </Link>
-        </CardContent>
-      </Card>
-    </div>
-  );
-}
-
-interface DailySummaryItemProps {
-  date: string;
-  expenses: Expense[];
-  localCode: string;
-}
-
-function DailySummaryItem({ date, expenses, localCode }: DailySummaryItemProps) {
-  const totalKRW = expenses.reduce((sum, e) => sum + toKRW(e), 0);
-
-  return (
-    <div className="flex items-center justify-between py-3 border-b last:border-0">
-      <span className="text-sm">{formatDateKo(date)}</span>
-      <div className="text-right">
-        <p className="text-sm font-semibold">
-          {formatCurrency(totalKRW, "KRW")}
-        </p>
-      </div>
-    </div>
-  );
-}
-
-interface CategorySummaryItemProps {
-  category: ExpenseCategory;
-  expenses: Expense[];
-  totalSpentKRW: number;
-  budgetAmount?: number;
-  localCode: string;
-}
-
-function CategorySummaryItem({
-  category,
-  expenses,
-  totalSpentKRW,
-  budgetAmount,
-  localCode,
-}: CategorySummaryItemProps) {
-  const config = EXPENSE_CATEGORY_CONFIG[category];
-  const categoryTotalKRW = expenses.reduce((sum, e) => sum + toKRW(e), 0);
-  const percent =
-    budgetAmount && budgetAmount > 0
-      ? Math.min((categoryTotalKRW / budgetAmount) * 100, 100)
-      : totalSpentKRW > 0
-        ? (categoryTotalKRW / totalSpentKRW) * 100
-        : 0;
-  const isOver = budgetAmount ? categoryTotalKRW > budgetAmount : false;
-
-  return (
-    <div className="flex items-center gap-3 py-3 border-b last:border-0">
-      <div className="w-9 h-9 rounded-full flex items-center justify-center text-lg bg-muted shrink-0">
-        {config.icon}
-      </div>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center justify-between mb-1">
-          <span className="text-sm font-medium">{config.label}</span>
-          <div className="text-right">
-            <span className="text-sm font-semibold">
-              {formatCurrency(categoryTotalKRW, localCode)}
-            </span>
-            {budgetAmount !== undefined && budgetAmount > 0 && (
-              <span className="text-xs text-muted-foreground ml-1">
-                / {formatCurrency(budgetAmount, localCode)}
-              </span>
-            )}
-          </div>
-        </div>
-        <Progress
-          value={percent}
-          className={cn("h-1.5", isOver && "[&>div]:bg-destructive")}
-        />
-        <p className="text-xs text-muted-foreground mt-0.5">
-          {budgetAmount && budgetAmount > 0
-            ? isOver
-              ? `${formatCurrency(categoryTotalKRW - budgetAmount, localCode)} 초과`
-              : `${percent.toFixed(1)}% 사용`
-            : `${percent.toFixed(1)}%`}
-        </p>
-      </div>
-    </div>
-  );
 }
 
 function parseTripJson<T>(raw: string | null | undefined): T | undefined {
@@ -214,6 +63,7 @@ export default function ExpensePage() {
   } = useTripExpenses(tripId);
 
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
 
   const expenses = dbItems as unknown as Expense[];
 
@@ -224,9 +74,9 @@ export default function ExpensePage() {
   const budget = parseTripJson<BudgetConfig>(activeTrip?.budget);
   const totalBudget = budget?.totalBudget ?? 0;
 
-  const totalSpentKRW = useMemo(
-    () => expenses.reduce((sum, e) => sum + toKRW(e), 0),
-    [expenses],
+  const totalSpentLocal = useMemo(
+    () => expenses.reduce((sum, e) => sum + toLocalAmount(e, localCode), 0),
+    [expenses, localCode],
   );
 
   const groupedByDate = useMemo(() => {
@@ -245,19 +95,30 @@ export default function ExpensePage() {
       map.set(e.category, [...existing, e]);
     });
     return Array.from(map.entries()).sort(([, a], [, b]) => {
-      const totalA = a.reduce((s, x) => s + toKRW(x), 0);
-      const totalB = b.reduce((s, x) => s + toKRW(x), 0);
+      const totalA = a.reduce((s, x) => s + toLocalAmount(x, localCode), 0);
+      const totalB = b.reduce((s, x) => s + toLocalAmount(x, localCode), 0);
       return totalB - totalA;
     });
-  }, [expenses]);
+  }, [expenses, localCode]);
 
   async function handleAddExpense(expense: Expense) {
-    await create(expense);
-    setDrawerOpen(false);
+    try {
+      await create(expense);
+      setDrawerOpen(false);
+    } catch {
+      toast.error("지출 추가에 실패했습니다. 다시 시도해주세요.");
+    }
   }
 
-  async function handleDeleteExpense(id: string) {
-    await remove(id);
+  async function handleConfirmDelete() {
+    if (!deleteTargetId) return;
+    try {
+      await remove(deleteTargetId);
+    } catch {
+      toast.error("지출 삭제에 실패했습니다. 다시 시도해주세요.");
+    } finally {
+      setDeleteTargetId(null);
+    }
   }
 
   if (tripLoading) {
@@ -277,7 +138,7 @@ export default function ExpensePage() {
   return (
     <div className="relative min-h-screen pb-20">
       {totalBudget > 0 ? (
-        <BudgetBar spent={totalSpentKRW} budget={totalBudget} localCode={localCode} />
+        <BudgetBar spent={totalSpentLocal} budget={totalBudget} localCode={localCode} />
       ) : (
         <NoBudgetPrompt />
       )}
@@ -285,15 +146,9 @@ export default function ExpensePage() {
       <Tabs defaultValue="all" className="px-0">
         <div className="sticky top-0 z-10 bg-background border-b px-4 py-2">
           <TabsList className="w-full">
-            <TabsTrigger value="all" className="flex-1">
-              전체
-            </TabsTrigger>
-            <TabsTrigger value="daily" className="flex-1">
-              일별
-            </TabsTrigger>
-            <TabsTrigger value="category" className="flex-1">
-              카테고리
-            </TabsTrigger>
+            <TabsTrigger value="all" className="flex-1">전체</TabsTrigger>
+            <TabsTrigger value="daily" className="flex-1">일별</TabsTrigger>
+            <TabsTrigger value="category" className="flex-1">카테고리</TabsTrigger>
           </TabsList>
         </div>
 
@@ -304,7 +159,7 @@ export default function ExpensePage() {
             <ExpenseList
               expenses={expenses}
               localCurrencyCode={localCode}
-              onDelete={handleDeleteExpense}
+              onDelete={(id) => setDeleteTargetId(id)}
             />
           )}
         </TabsContent>
@@ -312,9 +167,7 @@ export default function ExpensePage() {
         <TabsContent value="daily" className="mt-0">
           <Card className="mx-4 my-4">
             {expenseLoading ? (
-              <div className="p-4">
-                <Skeleton className="h-24 w-full" />
-              </div>
+              <div className="p-4"><Skeleton className="h-24 w-full" /></div>
             ) : groupedByDate.length === 0 ? (
               <div className="py-10 text-center text-sm text-muted-foreground">
                 일별 내역이 없습니다
@@ -337,9 +190,7 @@ export default function ExpensePage() {
         <TabsContent value="category" className="mt-0">
           <Card className="mx-4 my-4">
             {expenseLoading ? (
-              <div className="p-4">
-                <Skeleton className="h-24 w-full" />
-              </div>
+              <div className="p-4"><Skeleton className="h-24 w-full" /></div>
             ) : groupedByCategory.length === 0 ? (
               <div className="py-10 text-center text-sm text-muted-foreground">
                 카테고리 내역이 없습니다
@@ -351,7 +202,7 @@ export default function ExpensePage() {
                     key={category}
                     category={category}
                     expenses={catExpenses}
-                    totalSpentKRW={totalSpentKRW}
+                    totalSpentLocal={totalSpentLocal}
                     budgetAmount={budget?.categories[category]}
                     localCode={localCode}
                   />
@@ -360,7 +211,11 @@ export default function ExpensePage() {
             )}
           </Card>
           {budget && groupedByCategory.length > 0 && (
-            <CategoryBudgetSummary expenses={expenses} budget={budget} />
+            <CategoryBudgetSummary
+              expenses={expenses}
+              budget={budget}
+              localCode={localCode}
+            />
           )}
         </TabsContent>
       </Tabs>
@@ -386,6 +241,28 @@ export default function ExpensePage() {
           </div>
         </DrawerContent>
       </Drawer>
+
+      <Dialog
+        open={deleteTargetId !== null}
+        onOpenChange={(open) => { if (!open) setDeleteTargetId(null); }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>지출 삭제</DialogTitle>
+            <DialogDescription>
+              이 지출 내역을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setDeleteTargetId(null)}>
+              취소
+            </Button>
+            <Button variant="destructive" onClick={handleConfirmDelete}>
+              삭제
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

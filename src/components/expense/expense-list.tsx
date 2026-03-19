@@ -8,17 +8,15 @@ import { Button } from "@/components/ui/button";
 import { formatDateKo } from "@/lib/utils/date";
 import {
   formatCurrency,
-  convertToKRW,
+  convertCurrency,
   getCurrencyInfo,
 } from "@/lib/utils/currency";
 import type { Expense } from "@/types/expense";
 import { EXPENSE_CATEGORY_CONFIG } from "@/types/expense";
 
-const DEFAULT_RATE = 8.9;
-
 interface ExpenseListProps {
   expenses: Expense[];
-  localCurrencyCode?: string;
+  localCurrencyCode: string;
   onDelete?: (id: string) => void;
 }
 
@@ -30,30 +28,29 @@ function groupByDate(expenses: Expense[]): Map<string, Expense[]> {
   }, new Map<string, Expense[]>());
 }
 
-function toKRW(expense: Expense): number {
-  if (expense.currency === "KRW") return expense.amount;
-  return convertToKRW(expense.amount, expense.currency, DEFAULT_RATE);
+function toLocal(expense: Expense, localCode: string): number {
+  if (expense.currency === localCode) return expense.amount;
+  return convertCurrency(expense.amount, expense.currency, localCode);
 }
 
-function getDayTotalKRW(dayExpenses: Expense[]): number {
-  return dayExpenses.reduce((sum, e) => sum + toKRW(e), 0);
+function getDayTotalLocal(dayExpenses: Expense[], localCode: string): number {
+  return dayExpenses.reduce((sum, e) => sum + toLocal(e, localCode), 0);
 }
 
 function ExpenseItemRow({
   expense,
-  localCurrencyCode = "JPY",
+  localCurrencyCode,
   onDelete,
 }: {
   expense: Expense;
-  localCurrencyCode?: string;
+  localCurrencyCode: string;
   onDelete?: (id: string) => void;
 }) {
   const config = EXPENSE_CATEGORY_CONFIG[expense.category];
-  const isKRW = expense.currency === "KRW";
-  const krwAmount = toKRW(expense);
+  const isLocal = expense.currency === localCurrencyCode;
+  const localAmount = toLocal(expense, localCurrencyCode);
 
   const currencyInfo = getCurrencyInfo(expense.currency);
-  const isLocal = expense.currency === localCurrencyCode;
 
   return (
     <div className="flex items-center gap-3 py-3">
@@ -84,9 +81,9 @@ function ExpenseItemRow({
         <p className="text-sm font-semibold">
           {formatCurrency(expense.amount, expense.currency)}
         </p>
-        {!isKRW && (
+        {!isLocal && (
           <p className="text-xs text-muted-foreground">
-            {formatCurrency(krwAmount, "KRW")}
+            {formatCurrency(localAmount, localCurrencyCode)}
           </p>
         )}
       </div>
@@ -107,7 +104,7 @@ function ExpenseItemRow({
 
 export function ExpenseList({
   expenses,
-  localCurrencyCode = "JPY",
+  localCurrencyCode,
   onDelete,
 }: ExpenseListProps) {
   const grouped = useMemo(() => groupByDate(expenses), [expenses]);
@@ -131,7 +128,7 @@ export function ExpenseList({
   return (
     <div className="space-y-6">
       {entries.map(([date, dayExpenses]) => {
-        const dayTotalKRW = getDayTotalKRW(dayExpenses);
+        const dayTotalLocal = getDayTotalLocal(dayExpenses, localCurrencyCode);
         const sorted = [...dayExpenses].sort(
           (a, b) =>
             new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
@@ -141,7 +138,7 @@ export function ExpenseList({
             <div className="flex items-center justify-between mb-1 sticky top-0 bg-background py-1">
               <h3 className="text-sm font-semibold">{formatDateKo(date)}</h3>
               <span className="text-sm font-medium text-muted-foreground">
-                {formatCurrency(dayTotalKRW, "KRW")}
+                {formatCurrency(dayTotalLocal, localCurrencyCode)}
               </span>
             </div>
             <Separator className="mb-1" />

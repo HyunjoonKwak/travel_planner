@@ -20,6 +20,15 @@ const COUNTRY_CURRENCY: Record<string, string> = {
   VN: "VND",
 };
 
+// Approximate default exchange rates: 1 unit of currency → KRW
+const DEFAULT_RATES_TO_KRW: Record<string, number> = {
+  JPY: 9.4,    // 1 JPY = 9.4 KRW
+  THB: 40,     // 1 THB = 40 KRW
+  TWD: 44,     // 1 TWD = 44 KRW
+  VND: 0.058,  // 1 VND = 0.058 KRW
+  KRW: 1,
+};
+
 const FALLBACK_CURRENCY: CurrencyInfo = CURRENCIES.JPY;
 
 export function getCurrencyForCountry(countryCode: string): CurrencyInfo {
@@ -31,40 +40,44 @@ export function getCurrencyInfo(code: string): CurrencyInfo {
   return CURRENCIES[code.toUpperCase()] ?? FALLBACK_CURRENCY;
 }
 
+export function getDefaultRate(fromCode: string): number {
+  return DEFAULT_RATES_TO_KRW[fromCode.toUpperCase()] ?? 1;
+}
+
 export function formatCurrency(amount: number, code: string): string {
   const info = getCurrencyInfo(code);
-  return `${info.symbol}${amount.toLocaleString()}`;
+  const rounded = Math.round(amount);
+  return `${info.symbol}${rounded.toLocaleString()}`;
 }
 
-export function convertToKRW(
-  amount: number,
-  fromCode: string,
-  rate: number,
-): number {
-  return Math.round(amount * rate);
+export function convertToKRW(amount: number, fromCode: string, rate?: number): number {
+  const effectiveRate = rate ?? getDefaultRate(fromCode);
+  return Math.round(amount * effectiveRate);
 }
 
-export function convertFromKRW(
-  amountKRW: number,
-  toCode: string,
-  rate: number,
-): number {
-  return Math.round(amountKRW / rate);
+export function convertFromKRW(amountKRW: number, toCode: string, rate?: number): number {
+  const effectiveRate = rate ?? getDefaultRate(toCode);
+  if (effectiveRate === 0) return 0;
+  return Math.round(amountKRW / effectiveRate);
+}
+
+export function convertCurrency(amount: number, fromCode: string, toCode: string): number {
+  if (fromCode === toCode) return amount;
+  const krw = convertToKRW(amount, fromCode);
+  return convertFromKRW(krw, toCode);
 }
 
 // ---------------------------------------------------------------------------
 // Backward-compatible helpers (deprecated)
 // ---------------------------------------------------------------------------
 
-const DEFAULT_RATE = 8.9;
-
 /** @deprecated Use convertToKRW instead */
-export function jpyToKrw(jpy: number, rate: number = DEFAULT_RATE): number {
+export function jpyToKrw(jpy: number, rate: number = getDefaultRate("JPY")): number {
   return Math.round(jpy * rate);
 }
 
 /** @deprecated Use convertFromKRW instead */
-export function krwToJpy(krw: number, rate: number = DEFAULT_RATE): number {
+export function krwToJpy(krw: number, rate: number = getDefaultRate("JPY")): number {
   return Math.round(krw / rate);
 }
 
