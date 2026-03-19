@@ -9,13 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+// Select removed - using button grid for Drawer compatibility
 import { cn } from "@/lib/utils";
 import {
   formatCurrency,
@@ -189,28 +183,29 @@ export function ExpenseForm({ onSubmit, onCancel }: ExpenseFormProps) {
         )}
       </div>
 
-      {/* Category */}
+      {/* Category - button grid instead of dropdown (works inside Drawer) */}
       <div>
-        <Label htmlFor="category">카테고리 *</Label>
-        <Select
-          value={categoryValue}
-          onValueChange={(val) =>
-            setValue("category", val as ExpenseCategory, {
-              shouldValidate: true,
-            })
-          }
-        >
-          <SelectTrigger className={cn(errors.category && "border-destructive")}>
-            <SelectValue placeholder="카테고리 선택" />
-          </SelectTrigger>
-          <SelectContent>
-            {CATEGORY_OPTIONS.map(([key, config]) => (
-              <SelectItem key={key} value={key}>
-                {config.icon} {config.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <Label>카테고리 *</Label>
+        <div className="grid grid-cols-3 gap-1.5 mt-1.5">
+          {CATEGORY_OPTIONS.map(([key, config]) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() =>
+                setValue("category", key, { shouldValidate: true })
+              }
+              className={cn(
+                "flex items-center gap-1.5 rounded-lg border px-2.5 py-2 text-xs font-medium transition-colors",
+                categoryValue === key
+                  ? "border-primary bg-primary/10 text-primary"
+                  : "border-border text-muted-foreground hover:border-primary/40",
+              )}
+            >
+              <span>{config.icon}</span>
+              <span>{config.label}</span>
+            </button>
+          ))}
+        </div>
         <FieldError message={errors.category?.message} />
       </div>
 
