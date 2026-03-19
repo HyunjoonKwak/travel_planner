@@ -19,6 +19,10 @@ export const metadata: Metadata = {
     statusBarStyle: "default",
     title: "여행 플래너",
   },
+  icons: {
+    icon: "/favicon.ico",
+    apple: "/apple-touch-icon.png",
+  },
 };
 
 export const viewport: Viewport = {
@@ -27,7 +31,7 @@ export const viewport: Viewport = {
   maximumScale: 1,
   userScalable: false,
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#FFF1F2" },
+    { media: "(prefers-color-scheme: light)", color: "#F5F0E5" },
     { media: "(prefers-color-scheme: dark)", color: "#0F172A" },
   ],
 };
