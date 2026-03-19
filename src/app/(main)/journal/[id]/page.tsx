@@ -19,25 +19,22 @@ import {
   DialogContent,
 } from "@/components/ui/dialog";
 import { useActiveTrip } from "@/hooks/use-trip";
-import { useTripJournal } from "@/hooks/use-trip-data";
-import { useLocalStorage } from "@/hooks/use-local-storage";
+import { useTripJournal, useTripSchedules } from "@/hooks/use-trip-data";
 import {
   JournalEntry,
   MOOD_CONFIG,
 } from "@/types/journal";
-import { ScheduleItem, SCHEDULE_CATEGORY_CONFIG } from "@/types/schedule";
+import { SCHEDULE_CATEGORY_CONFIG } from "@/types/schedule";
 import { formatDateKo } from "@/lib/utils/date";
 import { PhotoThumbnail } from "@/components/journal/photo-thumbnail";
 import { PhotoViewer } from "@/components/journal/photo-viewer";
-
-const SCHEDULE_KEY = "travel-schedule";
 
 interface Props {
   readonly params: Promise<{ id: string }>;
 }
 
-function ScheduleSection({ date }: { readonly date: string }) {
-  const [schedules] = useLocalStorage<ScheduleItem[]>(SCHEDULE_KEY, []);
+function ScheduleSection({ date, tripId }: { readonly date: string; readonly tripId: string }) {
+  const { items: schedules } = useTripSchedules(tripId);
   const dayItems = schedules.filter((s) => s.date === date);
 
   if (dayItems.length === 0) return null;
@@ -50,7 +47,7 @@ function ScheduleSection({ date }: { readonly date: string }) {
       </h3>
       <div className="space-y-1.5">
         {dayItems.map((item) => {
-          const cat = SCHEDULE_CATEGORY_CONFIG[item.category];
+          const cat = SCHEDULE_CATEGORY_CONFIG[item.category as keyof typeof SCHEDULE_CATEGORY_CONFIG];
           return (
             <div
               key={item.id}
@@ -247,7 +244,7 @@ export default function JournalDetailPage({ params }: Props) {
         <Separator />
 
         {/* That day's schedule */}
-        <ScheduleSection date={entry.date} />
+        <ScheduleSection date={entry.date} tripId={activeTrip?.id ?? ""} />
       </div>
 
       {/* Delete confirm dialog */}

@@ -2,14 +2,15 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { KanaGrid } from "@/components/learn/kana-grid";
 import { Flashcard } from "@/components/learn/flashcard";
-import { useLocalStorage } from "@/hooks/use-local-storage";
+import { useActiveTrip } from "@/hooks/use-trip";
+import { useTripLearnProgress } from "@/hooks/use-trip-data";
 import {
   ALL_KATAKANA,
   KATAKANA_BASIC,
@@ -18,32 +19,47 @@ import {
 } from "@/lib/data/katakana";
 
 export default function KatakanaPage() {
-  const [completedChars, setCompletedChars] = useLocalStorage<string[]>(
-    "completed-katakana",
-    [],
-  );
-  const [learningChars, setLearningChars] = useLocalStorage<string[]>(
-    "learning-katakana",
-    [],
-  );
+  const { activeTrip } = useActiveTrip();
+  const tripId = activeTrip?.id ?? "";
+  const { data: progress, loading, debouncedSave } = useTripLearnProgress(tripId);
   const [mode, setMode] = useState<"grid" | "flashcard">("grid");
 
-  const progress = Math.round(
+  const completedChars = progress.completedKatakana;
+  const learningChars = progress.learningKatakana;
+
+  const progressPercent = Math.round(
     (completedChars.length / ALL_KATAKANA.length) * 100,
   );
 
   const handleComplete = (char: string, known: boolean) => {
     if (known) {
-      setCompletedChars((prev) =>
-        prev.includes(char) ? prev : [...prev, char],
-      );
-      setLearningChars((prev) => prev.filter((c) => c !== char));
+      const newCompleted = completedChars.includes(char)
+        ? completedChars
+        : [...completedChars, char];
+      const newLearning = learningChars.filter((c) => c !== char);
+      debouncedSave({
+        ...progress,
+        completedKatakana: newCompleted,
+        learningKatakana: newLearning,
+      });
     } else {
-      setLearningChars((prev) =>
-        prev.includes(char) ? prev : [...prev, char],
-      );
+      const newLearning = learningChars.includes(char)
+        ? learningChars
+        : [...learningChars, char];
+      debouncedSave({
+        ...progress,
+        learningKatakana: newLearning,
+      });
     }
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
 
   if (mode === "flashcard") {
     return (
@@ -83,9 +99,9 @@ export default function KatakanaPage() {
       </div>
 
       <div className="space-y-1">
-        <Progress value={progress} className="h-2" />
+        <Progress value={progressPercent} className="h-2" />
         <p className="text-right text-xs text-muted-foreground">
-          {progress}% 완료
+          {progressPercent}% 완료
         </p>
       </div>
 

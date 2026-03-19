@@ -2,12 +2,13 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PhraseCard } from "@/components/learn/phrase-card";
-import { useLocalStorage } from "@/hooks/use-local-storage";
+import { useActiveTrip } from "@/hooks/use-trip";
+import { useTripLearnProgress } from "@/hooks/use-trip-data";
 import { TRAVEL_PHRASES } from "@/lib/data/phrases";
 import {
   PHRASE_CATEGORY_CONFIG,
@@ -17,19 +18,32 @@ import {
 const CATEGORIES = Object.keys(PHRASE_CATEGORY_CONFIG) as PhraseCategory[];
 
 export default function PhrasesPage() {
-  const [savedPhrases, setSavedPhrases] = useLocalStorage<string[]>(
-    "saved-phrases",
-    [],
-  );
+  const { activeTrip } = useActiveTrip();
+  const tripId = activeTrip?.id ?? "";
+  const { data: progress, loading, debouncedSave } = useTripLearnProgress(tripId);
   const [activeCategory, setActiveCategory] = useState<PhraseCategory | "all">(
     "all",
   );
 
+  const savedPhrases = progress.savedPhrases;
+
   const handleToggleSave = (id: string) => {
-    setSavedPhrases((prev) =>
-      prev.includes(id) ? prev.filter((p) => p !== id) : [...prev, id],
-    );
+    const newSaved = savedPhrases.includes(id)
+      ? savedPhrases.filter((p) => p !== id)
+      : [...savedPhrases, id];
+    debouncedSave({
+      ...progress,
+      savedPhrases: newSaved,
+    });
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
 
   const filteredPhrases =
     activeCategory === "all"

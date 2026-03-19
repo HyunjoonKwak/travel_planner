@@ -103,6 +103,47 @@ export const checklists = sqliteTable("checklists", {
   updatedAt: text("updated_at").notNull(),
 });
 
+// Saved attractions - belong to a trip
+export const savedAttractions = sqliteTable("saved_attractions", {
+  id: text("id").primaryKey(),
+  tripId: text("trip_id")
+    .notNull()
+    .references(() => trips.id),
+  placeId: text("place_id").notNull(),
+  name: text("name").notNull(),
+  nameJa: text("name_ja"),
+  address: text("address"),
+  rating: real("rating"),
+  reviewCount: integer("review_count"),
+  city: text("city"),
+  cityName: text("city_name"),
+  googleMapsUrl: text("google_maps_url"),
+  lat: real("lat"),
+  lng: real("lng"),
+  source: text("source").notNull(), // 'recommendation' | 'user'
+  createdAt: text("created_at").notNull(),
+});
+
+// Learn progress - singleton per trip
+export const learnProgress = sqliteTable("learn_progress", {
+  id: text("id").primaryKey(),
+  tripId: text("trip_id")
+    .notNull()
+    .references(() => trips.id),
+  data: text("data").notNull(), // JSON
+  updatedAt: text("updated_at").notNull(),
+});
+
+// Quick memos - singleton per trip
+export const memos = sqliteTable("memos", {
+  id: text("id").primaryKey(),
+  tripId: text("trip_id")
+    .notNull()
+    .references(() => trips.id),
+  content: text("content").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
+
 // Photos metadata - belong to a trip
 export const photos = sqliteTable("photos", {
   id: text("id").primaryKey(),

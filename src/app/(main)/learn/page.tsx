@@ -4,8 +4,8 @@ import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { useLocalStorage } from "@/hooks/use-local-storage";
 import { useActiveTrip } from "@/hooks/use-trip";
+import { useTripLearnProgress } from "@/hooks/use-trip-data";
 import { ALL_HIRAGANA } from "@/lib/data/hiragana";
 import { ALL_KATAKANA } from "@/lib/data/katakana";
 import { TRAVEL_PHRASES } from "@/lib/data/phrases";
@@ -75,20 +75,17 @@ interface LearningModule {
 
 export default function LearnPage() {
   const { activeTrip } = useActiveTrip();
-  const [completedHiragana] = useLocalStorage<string[]>(
-    "completed-hiragana",
-    [],
-  );
-  const [completedKatakana] = useLocalStorage<string[]>(
-    "completed-katakana",
-    [],
-  );
-  const [savedPhrases] = useLocalStorage<string[]>("saved-phrases", []);
-  const [streak] = useLocalStorage<number>("study-streak", 0);
+  const tripId = activeTrip?.id ?? "";
+  const { data: learnData } = useTripLearnProgress(tripId);
 
   const tripCountry = activeTrip?.country ?? null;
   const isJapanTrip = tripCountry === "JP";
   const hasTrip = tripCountry !== null;
+
+  const completedHiragana = learnData.completedHiragana;
+  const completedKatakana = learnData.completedKatakana;
+  const savedPhrases = learnData.savedPhrases;
+  const streak = learnData.studyStreak;
 
   const hiraganaProgress = Math.round(
     (completedHiragana.length / ALL_HIRAGANA.length) * 100,

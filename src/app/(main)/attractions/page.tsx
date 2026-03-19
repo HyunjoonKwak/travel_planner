@@ -14,16 +14,13 @@ import {
 } from "@/components/attractions/attraction-card";
 import { AttractionSearchDrawer } from "@/components/attractions/attraction-search-drawer";
 import { getCityById } from "@/lib/data/destinations";
-import { useLocalStorage } from "@/hooks/use-local-storage";
+import { normalizeKo, parseDestinations } from "@/lib/utils/trip-helpers";
 import { useActiveTrip } from "@/hooks/use-trip";
 import { useRecommendations } from "@/hooks/use-recommendations";
+import { useTripAttractions } from "@/hooks/use-trip-data";
 import type { RecommendationResult } from "@/types/recommendation";
 import type { GooglePlaceResult } from "@/types/food-search";
 import { NoTripPrompt } from "@/components/common/no-trip-prompt";
-
-function normalizeKo(str: string): string {
-  return str.toLowerCase().replace(/\s+/g, "");
-}
 
 function recommendationToAttraction(
   item: RecommendationResult
@@ -66,9 +63,21 @@ function placeToAttraction(
   };
 }
 
-function parseDest(raw: string | null | undefined): string[] {
-  if (!raw) return [];
-  try { return JSON.parse(raw) as string[]; } catch { return []; }
+function attractionToPayload(a: SavedAttraction) {
+  return {
+    placeId: a.placeId,
+    name: a.name,
+    nameJa: a.nameJa,
+    address: a.address,
+    rating: a.rating,
+    reviewCount: a.reviewCount,
+    city: a.city,
+    cityName: a.cityName,
+    googleMapsUrl: a.googleMapsUrl,
+    lat: a.lat,
+    lng: a.lng,
+    source: a.source,
+  };
 }
 
 export default function AttractionsPage() {
@@ -78,22 +87,20 @@ export default function AttractionsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [addDrawerOpen, setAddDrawerOpen] = useState(false);
 
-  const [savedAttractionIds, setSavedAttractionIds] = useLocalStorage<
-    string[]
-  >("scheduled_attraction_ids", []);
+  const tripId = activeTrip?.id ?? "";
+  const {
+    items: savedAttractions,
+    loading: attractionsLoading,
+    create: saveAttraction,
+  } = useTripAttractions(tripId);
 
-  const [userAttractions, setUserAttractions] = useLocalStorage<
-    SavedAttraction[]
-  >("user_attractions", []);
-
-  const destinations = parseDest(activeTrip?.destinations);
+  const destinations = parseDestinations(activeTrip?.destinations);
   const effectiveDestinations = useMemo(
     () => (destinations.length > 0 ? destinations : []),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [destinations.join(",")],
   );
 
-  // All hooks MUST be before any conditional return
   const {
     items: recommendedItems,
     loading: recLoading,
@@ -117,14 +124,36 @@ export default function AttractionsPage() {
     [recommendedItems]
   );
 
+  // User-added attractions from DB (source === 'user')
+  const userAttractions = useMemo(
+    () =>
+      savedAttractions
+        .filter((a) => a.source === "user")
+        .map((a): SavedAttraction => ({
+          placeId: a.placeId,
+          name: a.name,
+          nameJa: a.nameJa ?? a.name,
+          address: a.address ?? "",
+          rating: a.rating ?? 0,
+          reviewCount: a.reviewCount ?? 0,
+          city: a.city ?? "",
+          cityName: a.cityName ?? "",
+          googleMapsUrl: a.googleMapsUrl ?? undefined,
+          lat: a.lat ?? undefined,
+          lng: a.lng ?? undefined,
+          source: "user",
+        })),
+    [savedAttractions]
+  );
+
+  const savedPlaceIds = useMemo(
+    () => new Set(savedAttractions.map((a) => a.placeId)),
+    [savedAttractions]
+  );
+
   const addedPlaceIds = useMemo(
     () => new Set(userAttractions.map((a) => a.placeId)),
     [userAttractions]
-  );
-
-  const scheduledSet = useMemo(
-    () => new Set(savedAttractionIds),
-    [savedAttractionIds]
   );
 
   function applyFilters(attractions: SavedAttraction[]): SavedAttraction[] {
@@ -153,7 +182,7 @@ export default function AttractionsPage() {
   );
 
   // Conditional returns AFTER all hooks
-  if (tripLoading) {
+  if (tripLoading || attractionsLoading) {
     return <div className="px-4 py-6 space-y-3"><div className="h-32 w-full bg-muted rounded-lg animate-pulse" /></div>;
   }
 
@@ -162,10 +191,8 @@ export default function AttractionsPage() {
   }
 
   function handleSchedule(attraction: SavedAttraction) {
-    setSavedAttractionIds((prev) => {
-      if (prev.includes(attraction.placeId)) return prev;
-      return [...prev, attraction.placeId];
-    });
+    if (savedPlaceIds.has(attraction.placeId)) return;
+    saveAttraction(attractionToPayload(attraction));
   }
 
   function handleAddPlace(place: GooglePlaceResult) {
@@ -173,11 +200,8 @@ export default function AttractionsPage() {
     const city = firstCity?.id ?? "osaka";
     const cityName = firstCity?.name ?? "오사카";
     const attraction = placeToAttraction(place, city, cityName);
-    setUserAttractions((prev) => {
-      const alreadyExists = prev.some((a) => a.placeId === place.placeId);
-      if (alreadyExists) return prev;
-      return [...prev, attraction];
-    });
+    if (savedPlaceIds.has(attraction.placeId)) return;
+    saveAttraction(attractionToPayload(attraction));
   }
 
   const cityLabel = selectedCities.map((c) => c.name).join(" · ");
@@ -293,7 +317,7 @@ export default function AttractionsPage() {
                   key={attraction.placeId}
                   attraction={attraction}
                   onSchedule={handleSchedule}
-                  scheduled={scheduledSet.has(attraction.placeId)}
+                  scheduled={savedPlaceIds.has(attraction.placeId)}
                 />
               ))}
             </div>
@@ -342,7 +366,7 @@ export default function AttractionsPage() {
                   key={attraction.placeId}
                   attraction={attraction}
                   onSchedule={handleSchedule}
-                  scheduled={scheduledSet.has(attraction.placeId)}
+                  scheduled={savedPlaceIds.has(attraction.placeId)}
                 />
               ))}
             </div>

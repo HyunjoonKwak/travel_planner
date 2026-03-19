@@ -1,20 +1,30 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { useLocalStorage } from "@/hooks/use-local-storage";
-
-const MEMO_KEY = "dashboard-quick-memo";
+import { useActiveTrip } from "@/hooks/use-trip";
+import { useTripMemo } from "@/hooks/use-trip-data";
 
 export function QuickMemo() {
-  const [savedMemo, setSavedMemo] = useLocalStorage<string>(MEMO_KEY, "");
-  const [draft, setDraft] = useState<string>(savedMemo);
+  const { activeTrip } = useActiveTrip();
+  const tripId = activeTrip?.id ?? "";
+  const { data: savedMemo, loading, save } = useTripMemo(tripId);
+  const [draft, setDraft] = useState<string>("");
   const [isSaved, setIsSaved] = useState(false);
+  const [initialized, setInitialized] = useState(false);
 
-  const handleSave = () => {
-    setSavedMemo(draft);
+  // Sync draft when DB data loads
+  useEffect(() => {
+    if (!loading && !initialized) {
+      setDraft(savedMemo);
+      setInitialized(true);
+    }
+  }, [loading, savedMemo, initialized]);
+
+  const handleSave = async () => {
+    await save(draft);
     setIsSaved(true);
     setTimeout(() => setIsSaved(false), 1500);
   };
@@ -24,7 +34,7 @@ export function QuickMemo() {
     setIsSaved(false);
   };
 
-  const isDirty = draft !== savedMemo;
+  const isDirty = initialized && draft !== savedMemo;
 
   return (
     <Card>
@@ -40,6 +50,7 @@ export function QuickMemo() {
           onChange={handleChange}
           placeholder="여행 준비 메모, 아이디어, 할 일 등을 적어보세요..."
           className="min-h-[120px] resize-none text-sm"
+          disabled={loading}
         />
       </CardContent>
       <CardFooter className="flex justify-between items-center pt-0">

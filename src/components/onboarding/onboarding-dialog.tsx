@@ -16,7 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
-import { useTripConfig } from "@/hooks/use-trip-config";
+import { useTrips } from "@/hooks/use-trip";
 import { DestinationSelector } from "@/components/settings/destination-selector";
 import { ThemeSelector } from "@/components/settings/theme-selector";
 import { getCityById } from "@/lib/data/destinations";
@@ -78,22 +78,37 @@ function buildPreview(
 }
 
 export function OnboardingDialog() {
-  const { config, updateConfig } = useTripConfig();
+  const { trips, loading, createTrip } = useTrips();
   const [step, setStep] = useState<Step>("welcome");
   const [country, setCountry] = useState("");
   const [destinations, setDestinations] = useState<ReadonlyArray<string>>([]);
   const [tripTheme, setTripTheme] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  const [done, setDone] = useState(false);
 
-  if (config.onboarded) {
+  // If there are already trips or still loading, don't show onboarding
+  if (loading || trips.length > 0 || done) {
     return null;
   }
 
   function handleSetup() {
-    updateConfig({
+    const cityNames = [...destinations]
+      .map((id) => getCityById(id)?.name)
+      .filter(Boolean)
+      .join("·");
+    const name = cityNames && tripTheme
+      ? `${cityNames} ${tripTheme}`
+      : cityNames
+        ? `${cityNames} 여행`
+        : tripTheme
+          ? `${tripTheme} 여행`
+          : "내 여행";
+
+    createTrip({
+      name,
       country,
-      destinations,
+      destinations: [...destinations],
       theme: tripTheme,
       startDate,
       endDate,
@@ -102,11 +117,11 @@ export function OnboardingDialog() {
   }
 
   function handleComplete() {
-    updateConfig({ onboarded: true });
+    setDone(true);
   }
 
   function handleSkip() {
-    updateConfig({ onboarded: true });
+    setDone(true);
   }
 
   const preview = buildPreview(destinations, tripTheme);

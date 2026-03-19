@@ -19,9 +19,10 @@ import { FoodDetail } from "@/components/food/food-detail";
 import { FoodSearchDrawer } from "@/components/food/food-search-drawer";
 import { getFoodSpotsForCities } from "@/lib/data/food-registry";
 import { getCityById } from "@/lib/data/destinations";
-import { useLocalStorage } from "@/hooks/use-local-storage";
+import { normalizeKo, parseDestinations } from "@/lib/utils/trip-helpers";
 import { useActiveTrip } from "@/hooks/use-trip";
 import { useRecommendations } from "@/hooks/use-recommendations";
+import { useTripFoodSpots } from "@/hooks/use-trip-data";
 import type { FoodCategory, FoodSpot } from "@/types/food";
 import { FOOD_CATEGORY_CONFIG } from "@/types/food";
 import type { GooglePlaceResult } from "@/types/food-search";
@@ -37,10 +38,6 @@ const CATEGORY_FILTERS: { key: FilterCategory; label: string }[] = [
     label: config.label,
   })),
 ];
-
-function normalizeKo(str: string): string {
-  return str.toLowerCase().replace(/\s+/g, "");
-}
 
 const TYPE_TO_CATEGORY: Record<string, FoodCategory> = {
   // Noodles
@@ -232,11 +229,6 @@ function FoodSection({
   );
 }
 
-function parseDest(raw: string | null | undefined): string[] {
-  if (!raw) return [];
-  try { return JSON.parse(raw) as string[]; } catch { return []; }
-}
-
 export default function FoodPage() {
   const { activeTrip, loading: tripLoading } = useActiveTrip();
   const [selectedCategory, setSelectedCategory] = useState<FilterCategory>("all");
@@ -246,9 +238,15 @@ export default function FoodPage() {
   const [detailDrawerOpen, setDetailDrawerOpen] = useState(false);
   const [addDrawerOpen, setAddDrawerOpen] = useState(false);
 
-  const [userSpots, setUserSpots] = useLocalStorage<FoodSpot[]>("user_food_spots", []);
+  const tripId = activeTrip?.id ?? "";
+  const {
+    items: dbUserSpots,
+    loading: spotsLoading,
+    create: createSpot,
+    remove: removeSpot,
+  } = useTripFoodSpots(tripId);
 
-  const destinations = parseDest(activeTrip?.destinations);
+  const destinations = parseDestinations(activeTrip?.destinations);
   const effectiveDestinations = useMemo(
     () => (destinations.length > 0 ? destinations : []),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -272,6 +270,32 @@ export default function FoodPage() {
   const selectedCities = useMemo(
     () => effectiveDestinations.map((id) => getCityById(id)).filter((c): c is NonNullable<typeof c> => !!c),
     [effectiveDestinations],
+  );
+
+  // Convert DB spots to FoodSpot type
+  const userSpots = useMemo(
+    (): FoodSpot[] =>
+      dbUserSpots.map((s) => ({
+        id: s.id,
+        name: s.name,
+        nameJa: s.nameJa ?? s.name,
+        category: (s.category ?? "other") as FoodCategory,
+        area: s.area ?? "",
+        address: s.address ?? "",
+        addressJa: s.address ?? "",
+        rating: s.rating ?? 0,
+        priceRange: s.priceRange ?? "가격 미상",
+        hours: s.hours ?? "영업시간 미등록",
+        recommendedMenu: [],
+        visited: false,
+        lat: s.lat ?? undefined,
+        lng: s.lng ?? undefined,
+        googleRating: s.googleRating ?? undefined,
+        googleReviewCount: s.googleReviewCount ?? undefined,
+        placeId: s.placeId ?? undefined,
+        mapUrl: s.mapUrl ?? undefined,
+      })),
+    [dbUserSpots]
   );
 
   const addedPlaceIds: Set<string> = useMemo(
@@ -314,7 +338,7 @@ export default function FoodPage() {
     [selectedCity, selectedCategory, searchQuery, userSpots],
   );
 
-  if (tripLoading) {
+  if (tripLoading || spotsLoading) {
     return (
       <div className="px-4 py-6">
         <RecommendationSkeleton />
@@ -327,15 +351,31 @@ export default function FoodPage() {
   }
 
   function handleDeleteUserSpot(id: string) {
-    setUserSpots((prev) => prev.filter((s) => s.id !== id));
+    removeSpot(id);
   }
 
   function handleAddPlace(place: GooglePlaceResult) {
     const cityName = selectedCities[0]?.name ?? "오사카";
     const spot = placeToFoodSpot(place, cityName);
-    setUserSpots((prev) => {
-      if (prev.some((s) => s.placeId === place.placeId)) return prev;
-      return [...prev, spot];
+    if (addedPlaceIds.has(place.placeId)) return;
+    createSpot({
+      name: spot.name,
+      nameJa: spot.nameJa,
+      category: spot.category,
+      area: spot.area,
+      address: spot.address,
+      addressJa: spot.addressJa,
+      rating: spot.rating,
+      priceRange: spot.priceRange,
+      hours: spot.hours,
+      placeId: spot.placeId,
+      googleRating: spot.googleRating,
+      googleReviewCount: spot.googleReviewCount,
+      lat: spot.lat,
+      lng: spot.lng,
+      mapUrl: spot.mapUrl,
+      visited: false,
+      recommendedMenu: [],
     });
   }
 

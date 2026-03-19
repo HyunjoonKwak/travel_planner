@@ -1,12 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { Plus } from "lucide-react";
+import { Plus, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { ChecklistGroup } from "@/components/checklist/checklist-group";
-import { useLocalStorage } from "@/hooks/use-local-storage";
+import { useTripChecklist, type ChecklistGroupData } from "@/hooks/use-trip-data";
 import {
   ChecklistGroup as ChecklistGroupType,
   getDefaultChecklist,
@@ -14,18 +14,24 @@ import {
 import { generateId } from "@/lib/utils/date";
 import { useActiveTrip } from "@/hooks/use-trip";
 
-const STORAGE_KEY = "checklist_groups";
-
 export default function ChecklistPage() {
-  const { activeTrip } = useActiveTrip();
+  const { activeTrip, loading: tripLoading } = useActiveTrip();
+  const tripId = activeTrip?.id ?? "";
   const tripCountry = activeTrip?.country ?? undefined;
-  const defaultChecklist = getDefaultChecklist(tripCountry);
 
-  const [groups, setGroups] = useLocalStorage<ChecklistGroupType[]>(
-    STORAGE_KEY,
-    defaultChecklist as ChecklistGroupType[],
-  );
+  const { data: dbGroups, loading: checklistLoading, save } = useTripChecklist(tripId);
   const [newItemText, setNewItemText] = useState("");
+
+  const defaultChecklist = getDefaultChecklist(tripCountry);
+  const groups: ChecklistGroupType[] = (dbGroups ?? defaultChecklist) as ChecklistGroupType[];
+
+  if (tripLoading || checklistLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
 
   const totalItems = groups.reduce((sum, g) => sum + g.items.length, 0);
   const checkedItems = groups.reduce(
@@ -35,18 +41,17 @@ export default function ChecklistPage() {
   const progress = totalItems === 0 ? 0 : Math.round((checkedItems / totalItems) * 100);
 
   function handleToggle(groupId: string, itemId: string) {
-    setGroups((prev) =>
-      prev.map((group) =>
-        group.id !== groupId
-          ? group
-          : {
-              ...group,
-              items: group.items.map((item) =>
-                item.id !== itemId ? item : { ...item, checked: !item.checked },
-              ),
-            },
-      ),
+    const updated = groups.map((group) =>
+      group.id !== groupId
+        ? group
+        : {
+            ...group,
+            items: group.items.map((item) =>
+              item.id !== itemId ? item : { ...item, checked: !item.checked },
+            ),
+          },
     );
+    save(updated as ChecklistGroupData[]);
   }
 
   function handleAddCustomItem() {
@@ -60,17 +65,17 @@ export default function ChecklistPage() {
       checked: false,
     };
 
-    setGroups((prev) => {
-      const existingCustom = prev.find((g) => g.id === customGroupId);
-      if (existingCustom) {
-        return prev.map((g) =>
-          g.id !== customGroupId
-            ? g
-            : { ...g, items: [...g.items, newItem] },
-        );
-      }
-      return [
-        ...prev,
+    let updated: ChecklistGroupType[];
+    const existingCustom = groups.find((g) => g.id === customGroupId);
+    if (existingCustom) {
+      updated = groups.map((g) =>
+        g.id !== customGroupId
+          ? g
+          : { ...g, items: [...g.items, newItem] },
+      );
+    } else {
+      updated = [
+        ...groups,
         {
           id: customGroupId,
           title: "직접 추가",
@@ -78,8 +83,9 @@ export default function ChecklistPage() {
           items: [newItem],
         },
       ];
-    });
+    }
 
+    save(updated as ChecklistGroupData[]);
     setNewItemText("");
   }
 

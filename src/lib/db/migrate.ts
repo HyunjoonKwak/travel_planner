@@ -102,6 +102,38 @@ export function initializeDatabase(): void {
       updated_at TEXT NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS saved_attractions (
+      id TEXT PRIMARY KEY,
+      trip_id TEXT NOT NULL REFERENCES trips(id),
+      place_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      name_ja TEXT,
+      address TEXT,
+      rating REAL,
+      review_count INTEGER,
+      city TEXT,
+      city_name TEXT,
+      google_maps_url TEXT,
+      lat REAL,
+      lng REAL,
+      source TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS learn_progress (
+      id TEXT PRIMARY KEY,
+      trip_id TEXT NOT NULL REFERENCES trips(id),
+      data TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS memos (
+      id TEXT PRIMARY KEY,
+      trip_id TEXT NOT NULL REFERENCES trips(id),
+      content TEXT NOT NULL DEFAULT '',
+      updated_at TEXT NOT NULL
+    );
+
     CREATE TABLE IF NOT EXISTS photos (
       id TEXT PRIMARY KEY,
       trip_id TEXT REFERENCES trips(id),

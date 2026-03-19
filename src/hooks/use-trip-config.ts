@@ -1,6 +1,5 @@
 "use client";
 
-import { useLocalStorage } from "./use-local-storage";
 import { getCityById } from "@/lib/data/destinations";
 
 export interface FlightInfo {
@@ -50,13 +49,6 @@ export interface TripConfig {
   readonly budget?: BudgetConfig;
 }
 
-// Legacy shape stored in localStorage before migration
-interface LegacyTripConfig extends Omit<TripConfig, "country" | "destinations"> {
-  readonly destination?: string;
-  readonly country?: string;
-  readonly destinations?: ReadonlyArray<string>;
-}
-
 const DEFAULT_CONFIG: TripConfig = {
   country: "",
   destinations: [],
@@ -69,21 +61,6 @@ const DEFAULT_CONFIG: TripConfig = {
   hotel: undefined,
   budget: undefined,
 };
-
-function migrateLegacy(raw: LegacyTripConfig): TripConfig {
-  return {
-    country: raw.country ?? "",
-    destinations: raw.destinations ?? [],
-    theme: raw.theme ?? "",
-    startDate: raw.startDate ?? "",
-    endDate: raw.endDate ?? "",
-    onboarded: raw.onboarded ?? false,
-    outboundFlight: raw.outboundFlight,
-    returnFlight: raw.returnFlight,
-    hotel: raw.hotel,
-    budget: raw.budget,
-  };
-}
 
 function safeJsonParse<T>(value: string | null | undefined): T | undefined {
   if (!value) return undefined;
@@ -128,19 +105,9 @@ export function setActiveTripCache(trip: typeof _cachedTrip) {
 }
 
 export function useTripConfig() {
-  const [rawConfig, setConfig] = useLocalStorage<LegacyTripConfig>(
-    "trip-config",
-    DEFAULT_CONFIG,
-  );
-
-  // Use cached DB trip if available, fall back to localStorage
   const config: TripConfig = _cachedTrip
     ? tripToConfig(_cachedTrip)
-    : migrateLegacy(rawConfig);
-
-  function updateConfig(updates: Partial<TripConfig>) {
-    setConfig((prev) => ({ ...prev, ...updates }));
-  }
+    : DEFAULT_CONFIG;
 
   function getTripName(): string {
     if (_cachedTrip?.name) {
@@ -172,5 +139,5 @@ export function useTripConfig() {
     return name;
   }
 
-  return { config, updateConfig, getTripName, getAppTitle };
+  return { config, getTripName, getAppTitle };
 }

@@ -2,7 +2,8 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { useLocalStorage } from "@/hooks/use-local-storage";
+import { useActiveTrip } from "@/hooks/use-trip";
+import { useTripLearnProgress } from "@/hooks/use-trip-data";
 import { ALL_HIRAGANA } from "@/lib/data/hiragana";
 import { ALL_KATAKANA } from "@/lib/data/katakana";
 import { TRAVEL_PHRASES } from "@/lib/data/phrases";
@@ -16,34 +17,28 @@ interface LearningItem {
 }
 
 export function LearnProgress() {
-  const [completedHiragana] = useLocalStorage<string[]>(
-    "completed-hiragana",
-    [],
-  );
-  const [completedKatakana] = useLocalStorage<string[]>(
-    "completed-katakana",
-    [],
-  );
-  const [savedPhrases] = useLocalStorage<string[]>("saved-phrases", []);
+  const { activeTrip } = useActiveTrip();
+  const tripId = activeTrip?.id ?? "";
+  const { data: learnData } = useTripLearnProgress(tripId);
 
   const learningItems: readonly LearningItem[] = [
     {
       label: "히라가나",
-      current: completedHiragana.length,
+      current: learnData.completedHiragana.length,
       total: ALL_HIRAGANA.length,
       icon: "あ",
       color: "[&>div]:bg-violet-500",
     },
     {
       label: "가타카나",
-      current: completedKatakana.length,
+      current: learnData.completedKatakana.length,
       total: ALL_KATAKANA.length,
       icon: "ア",
       color: "[&>div]:bg-blue-500",
     },
     {
       label: "여행 회화",
-      current: savedPhrases.length,
+      current: learnData.savedPhrases.length,
       total: TRAVEL_PHRASES.length,
       icon: "💬",
       color: "[&>div]:bg-amber-500",

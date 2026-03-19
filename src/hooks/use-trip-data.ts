@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 
 // Generic fetch hook for trip-scoped resources
 function useTripResource<T>(tripId: string, resourcePath: string) {
@@ -103,6 +103,81 @@ function useTripResource<T>(tripId: string, resourcePath: string) {
   return { items, loading, error, create, update, remove, refresh };
 }
 
+// Generic singleton hook for trip-scoped single-record resources
+function useTripSingleton<T>(tripId: string, resourcePath: string, defaultValue: T) {
+  const [data, setData] = useState<T>(defaultValue);
+  const [loading, setLoading] = useState(true);
+  const baseUrl = `/api/trips/${tripId}/${resourcePath}`;
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingDataRef = useRef<T | null>(null);
+  const saveRef = useRef<(newData: T) => Promise<boolean>>(null);
+
+  useEffect(() => {
+    if (!tripId) {
+      setLoading(false);
+      return;
+    }
+    let cancelled = false;
+    fetch(baseUrl)
+      .then((r) => r.json())
+      .then((json) => {
+        if (!cancelled && json.success && json.data != null) {
+          setData(json.data as T);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [tripId, baseUrl]);
+
+  const save = useCallback(
+    async (newData: T): Promise<boolean> => {
+      setData(newData);
+      pendingDataRef.current = null;
+      try {
+        const res = await fetch(baseUrl, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ data: newData }),
+        });
+        const json = await res.json();
+        return json.success === true;
+      } catch {
+        return false;
+      }
+    },
+    [baseUrl]
+  );
+  saveRef.current = save;
+
+  // Debounced save for frequent updates
+  const debouncedSave = useCallback(
+    (newData: T, delayMs = 500) => {
+      setData(newData);
+      pendingDataRef.current = newData;
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = setTimeout(() => {
+        pendingDataRef.current = null;
+        save(newData);
+      }, delayMs);
+    },
+    [save]
+  );
+
+  // Flush pending debounced save on unmount
+  useEffect(() => {
+    return () => {
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+      if (pendingDataRef.current !== null && saveRef.current) {
+        saveRef.current(pendingDataRef.current);
+      }
+    };
+  }, []);
+
+  return { data, loading, save, debouncedSave };
+}
+
 // Schedule types
 export interface ScheduleItem {
   id: string;
@@ -161,4 +236,95 @@ export interface JournalEntry {
 
 export function useTripJournal(tripId: string) {
   return useTripResource<JournalEntry>(tripId, "journal");
+}
+
+// Saved attractions
+export interface SavedAttractionItem {
+  id: string;
+  tripId: string;
+  placeId: string;
+  name: string;
+  nameJa: string | null;
+  address: string | null;
+  rating: number | null;
+  reviewCount: number | null;
+  city: string | null;
+  cityName: string | null;
+  googleMapsUrl: string | null;
+  lat: number | null;
+  lng: number | null;
+  source: string;
+  createdAt: string;
+}
+
+export function useTripAttractions(tripId: string) {
+  return useTripResource<SavedAttractionItem>(tripId, "attractions");
+}
+
+// User-added food spots
+export interface SavedFoodSpotItem {
+  id: string;
+  tripId: string;
+  name: string;
+  nameJa: string | null;
+  category: string | null;
+  area: string | null;
+  address: string | null;
+  rating: number | null;
+  priceRange: string | null;
+  hours: string | null;
+  placeId: string | null;
+  googleRating: number | null;
+  googleReviewCount: number | null;
+  lat: number | null;
+  lng: number | null;
+  mapUrl: string | null;
+}
+
+export function useTripFoodSpots(tripId: string) {
+  return useTripResource<SavedFoodSpotItem>(tripId, "food-spots");
+}
+
+// Checklist (singleton per trip)
+export interface ChecklistGroupData {
+  id: string;
+  title: string;
+  icon: string;
+  items: Array<{
+    id: string;
+    label: string;
+    checked: boolean;
+  }>;
+}
+
+export function useTripChecklist(tripId: string) {
+  return useTripSingleton<ChecklistGroupData[] | null>(tripId, "checklist", null);
+}
+
+// Learn progress (singleton per trip)
+export interface LearnProgressData {
+  completedHiragana: string[];
+  learningHiragana: string[];
+  completedKatakana: string[];
+  learningKatakana: string[];
+  savedPhrases: string[];
+  studyStreak: number;
+}
+
+const DEFAULT_LEARN_PROGRESS: LearnProgressData = {
+  completedHiragana: [],
+  learningHiragana: [],
+  completedKatakana: [],
+  learningKatakana: [],
+  savedPhrases: [],
+  studyStreak: 0,
+};
+
+export function useTripLearnProgress(tripId: string) {
+  return useTripSingleton<LearnProgressData>(tripId, "learn-progress", DEFAULT_LEARN_PROGRESS);
+}
+
+// Quick memo (singleton per trip)
+export function useTripMemo(tripId: string) {
+  return useTripSingleton<string>(tripId, "memos", "");
 }

@@ -9,40 +9,12 @@ interface UseRecommendationsOptions {
   enabled?: boolean;
 }
 
-interface CacheEntry {
-  data: RecommendationResult[];
-  timestamp: number;
-}
-
+// In-memory cache (survives within session, cleared on full reload)
+const memoryCache = new Map<string, { data: RecommendationResult[]; timestamp: number }>();
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 
 function buildCacheKey(type: string, cities: ReadonlyArray<string>): string {
   return `recommendations_${type}_${[...cities].sort().join(",")}`;
-}
-
-function readCache(key: string): RecommendationResult[] | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = window.localStorage.getItem(key);
-    if (!raw) return null;
-    const entry: CacheEntry = JSON.parse(raw);
-    if (Date.now() - entry.timestamp < CACHE_TTL_MS) {
-      return entry.data;
-    }
-    return null;
-  } catch {
-    return null;
-  }
-}
-
-function writeCache(key: string, data: RecommendationResult[]): void {
-  if (typeof window === "undefined") return;
-  try {
-    const entry: CacheEntry = { data, timestamp: Date.now() };
-    window.localStorage.setItem(key, JSON.stringify(entry));
-  } catch {
-    // Storage quota exceeded or unavailable — fail silently
-  }
 }
 
 export function useRecommendations({
@@ -59,9 +31,9 @@ export function useRecommendations({
   const fetchRecommendations = useCallback(async () => {
     if (!enabled || cities.length === 0) return;
 
-    const cached = readCache(cacheKey);
-    if (cached) {
-      setItems(cached);
+    const cached = memoryCache.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
+      setItems(cached.data);
       return;
     }
 
@@ -78,7 +50,7 @@ export function useRecommendations({
 
       if (data.status === "OK") {
         setItems(data.results);
-        writeCache(cacheKey, data.results);
+        memoryCache.set(cacheKey, { data: data.results, timestamp: Date.now() });
       } else {
         setError(data.status as string);
       }
@@ -95,13 +67,7 @@ export function useRecommendations({
   }, [fetchRecommendations]);
 
   const refresh = useCallback(() => {
-    if (typeof window !== "undefined") {
-      try {
-        window.localStorage.removeItem(cacheKey);
-      } catch {
-        // ignore
-      }
-    }
+    memoryCache.delete(cacheKey);
     fetchRecommendations();
   }, [cacheKey, fetchRecommendations]);
 
