@@ -208,13 +208,13 @@ export default function AttractionsPage() {
     setPendingAttraction(attraction);
   }
 
-  function handleDateConfirm(date: string) {
+  function handleDateConfirm(date: string, startTime: string, endTime: string) {
     if (!pendingAttraction) return;
     const name = pendingAttraction.name;
     createSchedule({
       date,
-      startTime: "10:00",
-      endTime: "12:00",
+      startTime,
+      endTime,
       title: name,
       titleJa: pendingAttraction.nameJa,
       location: name,
@@ -223,7 +223,7 @@ export default function AttractionsPage() {
       memo: pendingAttraction.address,
     });
     setPendingAttraction(null);
-    toast.success(`${name} 일정이 ${formatDateKo(date)}에 추가되었습니다`);
+    toast.success(`${name} 일정이 ${formatDateKo(date)} ${startTime}에 추가되었습니다`);
   }
 
   function handleAddPlace(place: GooglePlaceResult) {
@@ -418,6 +418,8 @@ export default function AttractionsPage() {
         tripDates={tripDates}
         itemTitle={pendingAttraction?.name ?? ""}
         itemTitleJa={pendingAttraction?.nameJa}
+        defaultStartTime="10:00"
+        defaultEndTime="12:00"
         onConfirm={handleDateConfirm}
       />
     </div>

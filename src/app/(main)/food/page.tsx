@@ -400,13 +400,13 @@ export default function FoodPage() {
     setPendingFoodSpot(spot);
   }
 
-  function handleDateConfirm(date: string) {
+  function handleDateConfirm(date: string, startTime: string, endTime: string) {
     if (!pendingFoodSpot) return;
     const name = pendingFoodSpot.name;
     createSchedule({
       date,
-      startTime: "12:00",
-      endTime: "13:30",
+      startTime,
+      endTime,
       title: name,
       titleJa: pendingFoodSpot.nameJa,
       location: name,
@@ -415,7 +415,7 @@ export default function FoodPage() {
       memo: pendingFoodSpot.address,
     });
     setPendingFoodSpot(null);
-    toast.success(`${name} 일정이 ${formatDateKo(date)}에 추가되었습니다`);
+    toast.success(`${name} 일정이 ${formatDateKo(date)} ${startTime}에 추가되었습니다`);
   }
 
   const cityLabel = selectedCities.map((c) => c.name).join(" · ");
@@ -559,6 +559,8 @@ export default function FoodPage() {
         tripDates={tripDates}
         itemTitle={pendingFoodSpot?.name ?? ""}
         itemTitleJa={pendingFoodSpot?.nameJa}
+        defaultStartTime="12:00"
+        defaultEndTime="13:30"
         onConfirm={handleDateConfirm}
       />
     </div>
